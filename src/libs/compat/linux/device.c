@@ -227,6 +227,7 @@ linux_device_uninit_driver(void* driverCookie)
 static status_t
 linux_device_init_device(void* driverCookie, void** _deviceCookie)
 {
+	*_deviceCookie = driverCookie;
 }
 
 static void
