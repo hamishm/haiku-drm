@@ -38,7 +38,7 @@ struct file_operations;
 struct inode;
 struct module;
 
-struct linux_cdev {
+struct cdev {
 	struct kobject kobj;
 	struct module* owner;
 	const struct file_operations* ops;
@@ -48,25 +48,22 @@ struct linux_cdev {
 	struct list_head entry;
 };
 
+
+extern int cdev_add(struct cdev* cdev, dev_t dev, unsigned count);
+
+
 static inline void
 cdev_release(struct kobject *kobj)
 {
 	struct cdev* cdev;
 
 	cdev = container_of(kobj, struct cdev, kobj);
-	if (cdev->cdev)
-		destroy_dev(cdev->cdev);
 	kfree(cdev);
 }
 
 static inline void
 cdev_static_release(struct kobject *kobj)
 {
-	struct cdev* cdev;
-
-	cdev = container_of(kobj, struct linux_cdev, kobj);
-	if (cdev->cdev)
-		destroy_dev(cdev->cdev);
 }
 
 static struct kobj_type cdev_ktype = {
@@ -89,33 +86,19 @@ cdev_alloc(void)
 {
 	struct cdev* cdev;
 
-	cdev = kzalloc(sizeof(struct linux_cdev), GFP_KERNEL);
+	cdev = kzalloc(sizeof(struct cdev), GFP_KERNEL);
 	if (cdev != NULL)
 		kobject_init(&cdev->kobj, &cdev_ktype);
 	return cdev;
 }
 
 static inline void
-cdev_put(struct linux_cdev *p)
+cdev_put(struct cdev *p)
 {
 	kobject_put(&p->kobj);
 }
 
 
-extern int cdev_add(struct cdev* cdev, dev_t dev, unsigned count)
-
-static inline int
-cdev_add(struct cdev* cdev, dev_t dev, unsigned count)
-{
-	if (count != 1)
-		panic("cdev_add: Unsupported count: %d", count);
-	cdev->cdev = make_dev(&linuxcdevsw, MINOR(dev), 0, 0, 0700, 
-	    "%s", kobject_name(&cdev->kobj));
-	cdev->dev = dev;
-	cdev->cdev->si_drv1 = cdev;
-
-	return (0);
-}
 
 static inline void
 cdev_del(struct cdev* cdev)
@@ -123,6 +106,5 @@ cdev_del(struct cdev* cdev)
 	kobject_put(&cdev->kobj);
 }
 
-#define	cdev	linux_cdev
 
 #endif	/* _LINUX_CDEV_H_ */

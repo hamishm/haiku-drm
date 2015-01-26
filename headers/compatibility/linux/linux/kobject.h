@@ -31,10 +31,11 @@
 
 #include <linux/kernel.h>
 #include <linux/kref.h>
+#include <linux/list.h>
 #include <linux/slab.h>
 
 struct kobject;
-struct sysctl_oid;
+
 
 struct kobj_type {
 	void (*release)(struct kobject *kobj);
@@ -45,12 +46,11 @@ struct kobj_type {
 extern struct kobj_type kfree_type;
 
 struct kobject {
-	struct kobject		*parent;
-	char			*name;
-	struct kref		kref;
-	struct kobj_type	*ktype;
-	struct list_head	entry;
-	struct sysctl_oid	*oidp;
+	struct kobject *parent;
+	char *name;
+	struct kref kref;
+	struct kobj_type *ktype;
+	struct list_head entry;
 };
 
 extern struct kobject *mm_kobj;
@@ -62,7 +62,6 @@ kobject_init(struct kobject *kobj, struct kobj_type *ktype)
 	kref_init(&kobj->kref);
 	INIT_LIST_HEAD(&kobj->entry);
 	kobj->ktype = ktype;
-	kobj->oidp = NULL;
 }
 
 static inline void kobject_put(struct kobject *kobj);

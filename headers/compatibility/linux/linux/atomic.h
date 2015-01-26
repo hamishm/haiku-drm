@@ -66,7 +66,7 @@ atomic_sub_return(int i, atomic_t *v)
 }
 
 static inline void
-atomic_set(atomic_t *v, int i)
+linux_atomic_set(atomic_t *v, int i)
 {
 	atomic_set(&v->counter, i);
 }
@@ -133,7 +133,9 @@ atomic_set_mask(int mask, atomic_t *v)
 
 #undef atomic_add
 #undef atomic_sub
+#undef atomic_set
 #define	atomic_add(i, v)		atomic_add_return((i), (v))
 #define	atomic_sub(i, v)		atomic_sub_return((i), (v))
+#define atomic_set(v, i)		linux_atomic_set((v), (i))
 
 #endif	/* _ASM_ATOMIC_H_ */

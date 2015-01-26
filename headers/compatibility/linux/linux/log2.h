@@ -30,24 +30,31 @@
 #ifndef	_LINUX_LOG2_H_
 #define	_LINUX_LOG2_H_
 
+#include <linux/bitops.h>
 #include <linux/types.h>
 
 static inline unsigned long
 roundup_pow_of_two(unsigned long x)
 {
-	return (1UL << flsl(x - 1));
+	if (x == 0)
+		return 1;
+	if (x == 1)
+		return 1;
+	return 1UL << (__flsl(x - 1) + 1);
 }
 
 static inline int
 is_power_of_2(unsigned long n)
 {
-	return (n == roundup_pow_of_two(n));
+	return n == roundup_pow_of_two(n);
 }
 
 static inline unsigned long
 rounddown_pow_of_two(unsigned long x)
 {
-        return (1UL << (flsl(x) - 1));
+	if (x == 1)
+		return 1;
+	return 1UL << __flsl(x);
 }
 
 
@@ -67,7 +74,7 @@ int ____ilog2_NaN(void);
 static inline __attribute__((const))
 int __ilog2_u32(u32 n)
 {
-	return flsl(n) - 1;
+	return __flsl(n);
 }
 #endif
 
@@ -75,7 +82,7 @@ int __ilog2_u32(u32 n)
 static inline __attribute__((const))
 int __ilog2_u64(u64 n)
 {
-	return flsl(n) - 1;
+	return __flsl(n);
 }
 #endif
 

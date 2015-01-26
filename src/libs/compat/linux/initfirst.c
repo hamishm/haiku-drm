@@ -4,6 +4,7 @@
  */
 
 #include <linux/init.h>
+#include <stddef.h>
 
 
 static initcall_t __attribute__ ((section(".module_init")))

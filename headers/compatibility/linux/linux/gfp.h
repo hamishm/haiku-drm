@@ -30,17 +30,13 @@
 #ifndef	_LINUX_GFP_H_
 #define	_LINUX_GFP_H_
 
-#include <sys/cdefs.h>
-#include <sys/types.h>
-#include <sys/systm.h>
-#include <sys/malloc.h>
+#include <malloc.h>
 
-#include <linux/page.h>
 
-#include <vm/vm_param.h>
-#include <vm/vm_object.h>
-#include <vm/vm_extern.h>
-#include <vm/vm_kern.h>
+struct page {
+	void* address;
+};
+
 
 #define	__GFP_NOWARN	0
 #define	__GFP_HIGHMEM	0
@@ -54,21 +50,24 @@
 #define	GFP_ATOMIC		HEAP_DONT_WAIT_FOR_MEMORY
 #define	GFP_IOFS		HEAP_DONT_WAIT_FOR_MEMORY
 
-static inline void *
+static inline void*
 page_address(struct page *page)
 {
-
-	if (page->object != kmem_object && page->object != kernel_object)
-		return (NULL);
-	return ((void *)(uintptr_t)(VM_MIN_KERNEL_ADDRESS +
-	    IDX_TO_OFF(page->pindex)));
+	return page->address;
 }
-
+/*
 static inline unsigned long
 _get_page(gfp_t mask)
 {
+	return (unsigned long)memalign_etc(PAGE_SIZE, PAGE_SIZE, mask);
+}
 
-	return kmem_malloc(kmem_arena, PAGE_SIZE, mask);
+static inline unsigned long
+get_zeroed_page(gfp_t mask)
+{
+	unsigned long page = _get_page(mask);
+	memset((void*)page, 0, PAGE_SIZE);
+	return page;
 }
 
 #define	get_zeroed_page(mask)	_get_page((mask) | M_ZERO)
@@ -93,7 +92,7 @@ __free_page(struct page *m)
 		    m);
 	kmem_free(kmem_arena, (vm_offset_t)page_address(m), PAGE_SIZE);
 }
-
+/*
 static inline void
 __free_pages(struct page *m, unsigned int order)
 {
@@ -109,23 +108,24 @@ __free_pages(struct page *m, unsigned int order)
  * Alloc pages allocates directly from the buddy allocator on linux so
  * order specifies a power of two bucket of pages and the results
  * are expected to be aligned on the size as well.
- */
-static inline struct page *
+ *//*
+static inline struct page*
 alloc_pages(gfp_t gfp_mask, unsigned int order)
 {
-	unsigned long page;
+	void* address;
 	size_t size;
 
 	size = PAGE_SIZE << order;
-	page = kmem_alloc_contig(kmem_arena, size, gfp_mask, 0, -1,
-	    size, 0, VM_MEMATTR_DEFAULT);
-	if (page == 0)
-		return (NULL);
-        return (virt_to_page(page));
+	area_id area = create_area("linux pages", &address, B_ANY_KERNEL_ADDRESS,
+		size, B_CONTIGUOUS, B_READ_AREA | B_WRITE_AREA);
+	if (area < 0)
+		return NULL;
+
+	return page_struct(address);
 }
 
 #define alloc_pages_node(node, mask, order)     alloc_pages(mask, order)
 
 #define kmalloc_node(chunk, mask, node)         kmalloc(chunk, mask)
-
+*/
 #endif	/* _LINUX_GFP_H_ */

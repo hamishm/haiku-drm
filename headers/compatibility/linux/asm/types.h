@@ -28,7 +28,6 @@
 #ifndef	_ASM_TYPES_H_
 #define	_ASM_TYPES_H_
 
-typedef unsigned short umode_t;
 
 typedef signed char __s8;
 typedef unsigned char __u8;

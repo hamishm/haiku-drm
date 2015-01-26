@@ -28,6 +28,8 @@
 #ifndef	_LINUX_BITOPS_H_
 #define	_LINUX_BITOPS_H_
 
+#include <string.h>
+
 #include <SupportDefs.h>
 
 
@@ -47,25 +49,65 @@
 static inline int
 __ffs(int mask)
 {
+#if __GNUC__ >= 4
 	return __builtin_ffs(mask) - 1;
+#else
+	int i;
+	unsigned int umask = (unsigned int)mask;
+	for (i = 0; umask != 0; i++) {
+		if ((umask & 0x1) != 0)
+			return i;
+		umask >>= 1;
+	}
+	return -1;
+#endif
 }
 
 static inline int
 __fls(int mask)
 {
-	return __builtin_fls(mask) - 1;
+#if __GNUC__ >= 4
+	return sizeof(int) * 8 - __builtin_clz(mask) + 1;
+#else
+	int i;
+	unsigned int umask = (unsigned int)mask;
+	for (i = 0; umask != 0; i++) {
+		umask >>= 1;
+	}
+	return i - 1;
+#endif
 }
 
 static inline int
 __ffsl(long mask)
 {
+#if __GNUC__ >= 4
 	return __builtin_ffsl(mask) - 1;
+#else
+	int i;
+	unsigned long umask = (unsigned long)mask;
+	for (i = 0; umask != 0; i++) {
+		if ((umask & 0x1) != 0)
+			return i;
+		umask >>= 1;
+	}
+	return -1;
+#endif
 }
 
 static inline int
 __flsl(long mask)
 {
-	return __builtin_flsl(mask) - 1;
+#if __GNUC__ >= 4
+	return sizeof(int) * 8 - __builtin_clzl(mask) + 1;
+#else
+	int i;
+	unsigned long umask = (unsigned long)mask;
+	for (i = 0; umask != 0; i++) {
+		umask >>= 1;
+	}
+	return i - 1;
+#endif
 }
 
 
@@ -311,7 +353,11 @@ test_and_clear_bit(long bit, long *var)
 	bit = 1 << bit;
 	do {
 		val = *(volatile long *)var;
-	} while (atomic_test_and_set64(var, val & ~bit, val) == 0);
+#if BITS_PER_LONG == 32
+	} while (atomic_test_and_set((long*)var, val & ~bit, val) == 0);
+#else
+	} while (atomic_test_and_set64((long*)var, val & ~bit, val) == 0);
+#endif
 
 	return !!(val & bit);
 }
@@ -326,7 +372,11 @@ test_and_set_bit(long bit, volatile unsigned long *var)
 	bit = 1 << bit;
 	do {
 		val = *(volatile long *)var;
-	} while (atomic_test_and_set64(var, val | bit, val) == 0);
+#if BITS_PER_LONG == 32
+	} while (atomic_test_and_set((long*)var, val | bit, val) == 0);
+#else
+	} while (atomic_test_and_set64((long*)var, val | bit, val) == 0);
+#endif
 
 	return !!(val & bit);
 }

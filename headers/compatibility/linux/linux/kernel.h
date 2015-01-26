@@ -32,7 +32,12 @@
 #include <linux/bitops.h>
 #include <linux/compiler.h>
 #include <linux/log2.h>
+#include <linux/slab.h>
 #include <linux/types.h>
+
+#include <stdarg.h>
+#include <stdio.h>
+
 
 #define KERN_CONT       ""
 #define	KERN_EMERG	"<0>"
@@ -154,8 +159,8 @@
 #define	simple_strtoul	strtoul
 #define	simple_strtol	strtol
 
-#define min(x, y)	(x < y ? x : y)
-#define max(x, y)	(x > y ? x : y)
+//#define min(x, y)	(x < y ? x : y)
+//#define max(x, y)	(x > y ? x : y)
 #define min_t(type, _x, _y)	(type)(_x) < (type)(_y) ? (type)(_x) : (_y)
 #define max_t(type, _x, _y)	(type)(_x) > (type)(_y) ? (type)(_x) : (_y)
 
@@ -192,14 +197,14 @@ static inline char *kvasprintf(gfp_t gfp, const char *fmt, va_list ap)
 	char *p = NULL;
 	va_list aq;
 
-	va_copy(aq, ap);
+	__va_copy(aq, ap);
 	len = vsnprintf(NULL, 0, fmt, aq);
 	va_end(aq);
 
 	if (len < 0)
 		return NULL;
 
-	p = malloc_etc(len + 1, gfp);
+	p = kmalloc(len + 1, gfp);
 	if (p == NULL)
 		return NULL;
 

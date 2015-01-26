@@ -46,12 +46,10 @@ typedef _Bool bool;
 #define	false	FALSE
 #endif
 
-typedef u64 phys_addr_t;
-
 typedef unsigned long kernel_ulong_t;
 typedef unsigned gfp_t;
 typedef uint64_t loff_t;
-typedef vm_paddr_t resource_size_t;
+typedef phys_addr_t resource_size_t;
 
 #define	DECLARE_BITMAP(n, bits)						\
 	unsigned long n[howmany(bits, sizeof(long) * 8)]

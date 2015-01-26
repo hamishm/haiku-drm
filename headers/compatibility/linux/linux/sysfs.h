@@ -2,7 +2,7 @@
  * Copyright (c) 2010 Isilon Systems, Inc.
  * Copyright (c) 2010 iX Systems, Inc.
  * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013 François Tigeot
+ * Copyright (c) 2013, 2014 Mellanox Technologies, Ltd.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,55 +26,77 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef _LINUX_KREF_H_
-#define _LINUX_KREF_H_
 
-#include <linux/atomic.h>
+#ifndef	_LINUX_SYSFS_H_
+#define	_LINUX_SYSFS_H_
 
-struct kref {
-	atomic_t count;
+
+struct attribute {
+	const char* name;
+	struct module* owner;
+	mode_t mode;
 };
 
-static inline void
-kref_init(struct kref *kref)
+struct sysfs_ops {
+	ssize_t (*show)(struct kobject*, struct attribute*, char*);
+	ssize_t (*store)(struct kobject*, struct attribute*, const char*,
+		size_t);
+};
+
+struct attribute_group {
+	const char* name;
+	mode_t (*is_visible)(struct kobject*, struct attribute*, int);
+	struct attribute** attrs;
+};
+
+
+#define	__ATTR(_name, _mode, _show, _store) {				\
+	.attr = { .name = __stringify(_name), .mode = _mode },	\
+	.show = _show, .store  = _store,						\
+}
+
+#define	__ATTR_RO(_name) {									\
+	.attr = { .name = __stringify(_name), .mode = 0444 },	\
+	.show   = _name##_show,									\
+}
+
+#define	__ATTR_NULL	{ .attr = { .name = NULL } }
+
+
+static inline int
+sysfs_create_file(struct kobject* kobj, const struct attribute* attr)
 {
-	kref->count.counter = 1;
+	return 0;
 }
 
 static inline void
-kref_get(struct kref *kref)
+sysfs_remove_file(struct kobject* kobj, const struct attribute* attr)
 {
-	atomic_add_return(1, &kref->count);
+}
+
+static inline void
+sysfs_remove_group(struct kobject* kobj, const struct attribute_group* grp)
+{
 }
 
 static inline int
-kref_put(struct kref *kref, void (*rel)(struct kref *kref))
+sysfs_create_group(struct kobject* kobj, const struct attribute_group* grp)
 {
-	if (atomic_sub(1, &kref->count) <= 0) {
-		rel(kref);
-		return 1;
-	}
 	return 0;
 }
 
 static inline int
-kref_sub(struct kref *kref, unsigned int count,
-	     void (*rel)(struct kref *kref))
+sysfs_create_dir(struct kobject* kobj)
 {
-	if (atomic_sub(1, &kref->count) <= 0) {
-		rel(kref);
-		return 1;
-	}
 	return 0;
 }
 
-/*
- * kref_get_unless_zero: Increment refcount for object unless it is zero.
- */
-static inline int
-kref_get_unless_zero(struct kref *kref)
+static inline void
+sysfs_remove_dir(struct kobject* kobj)
 {
-	return atomic_add_unless(&kref->count, 1, 0);
 }
 
-#endif /* _LINUX_KREF_H_ */
+#define sysfs_attr_init(attr) do {} while(0)
+
+
+#endif	/* _LINUX_SYSFS_H_ */

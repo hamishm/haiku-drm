@@ -1,0 +1,31 @@
+SubDir HAIKU_TOP src libs compat linux ;
+
+UseHeaders [ FDirName $(SUBDIR) ] : true ;
+UseHeaders [ FDirName $(SUBDIR) compat ] : true ;
+UseHeaders [ FDirName $(HAIKU_TOP) headers compatibility linux ] : true ;
+
+UsePrivateHeaders net ;
+UsePrivateKernelHeaders ;
+UseHeaders $(HAIKU_PRIVATE_KERNEL_HEADERS) : true ;
+
+# Enabling C++ structures in C only code
+Includes [ FGristFiles kernel_c++_structs.h ]
+	: <src!system!kernel>kernel_c++_struct_sizes.h ;
+
+SubDirCcFlags [ FDefines _KERNEL=1 B_USE_POSITIVE_POSIX_ERRORS=1 ] ;
+
+KernelStaticLibrary linux_compat.a :
+	initfirst.c  # Must be first
+
+	cdev.c
+	device.c
+	driver.c
+	idr.c
+	kobject.c
+
+	condvar.cpp
+	wait.cpp
+	workqueue.cpp
+
+	initlast.c  # Must be last
+	;

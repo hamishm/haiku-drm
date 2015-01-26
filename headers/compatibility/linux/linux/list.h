@@ -28,6 +28,8 @@
 #ifndef _LINUX_LIST_H_
 #define _LINUX_LIST_H_
 
+#include <stddef.h>
+
 
 struct list_head {
 	struct list_head *next;
@@ -56,23 +58,23 @@ list_del(struct list_head *entry)
 }
 
 static inline void list_replace(struct list_head *old,
-				struct list_head *new)
+    struct list_head *entry)
 {
-	new->next = old->next;
-	new->next->prev = new;
-	new->prev = old->prev;
-	new->prev->next = new;
+	entry->next = old->next;
+	entry->next->prev = entry;
+	entry->prev = old->prev;
+	entry->prev->next = entry;
 }
 
 static inline void
-_list_add(struct list_head *new, struct list_head *prev,
+_list_add(struct list_head *entry, struct list_head *prev,
     struct list_head *next)
 {
 
-	next->prev = new;
-	new->next = next;
-	new->prev = prev;
-	prev->next = new;
+	next->prev = entry;
+	entry->next = next;
+	entry->prev = prev;
+	prev->next = entry;
 }
 
 static inline void
@@ -282,13 +284,13 @@ hlist_add_after(struct hlist_node *n, struct hlist_node *next)
 }
  
 static inline void
-hlist_move_list(struct hlist_head *old, struct hlist_head *new)
+hlist_move_list(struct hlist_head *from, struct hlist_head *to)
 {
 
-	new->first = old->first;
-	if (new->first)
-		new->first->pprev = &new->first;
-	old->first = NULL;
+	to->first = from->first;
+	if (to->first)
+		to->first->pprev = &to->first;
+	from->first = NULL;
 }
  
 #define	hlist_entry(ptr, type, field)	container_of(ptr, type, field)

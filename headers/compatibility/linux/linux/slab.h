@@ -74,6 +74,7 @@ kmem_ctor(void* cookie, void* object)
 {
 	void (*ctor)(void *) = cookie;
 	ctor(object);
+	return 0;
 }
 
 
@@ -84,27 +85,27 @@ kmem_cache_create(char *name, size_t size, size_t align, u_long flags,
 	struct kmem_cache *c = malloc(sizeof(struct kmem_cache));
 
 	c->cache = create_object_cache(name, size, align, ctor,
-		ctor != NULL ? kmem_ctor : NULL, NULL);
+		ctor != NULL ? (void*)kmem_ctor : NULL, NULL);
 	return c;
 }
 
 static inline void *
 kmem_cache_alloc(struct kmem_cache *c, int flags)
 {
-	return object_cache_alloc(c->cache(c->cache_zone, c->cache_ctor, flags);
+	return object_cache_alloc(c->cache, flags);
 }
 
 static inline void
 kmem_cache_free(struct kmem_cache *c, void *m)
 {
-	uma_zfree(c->cache_zone, m);
+	object_cache_free(c->cache, m, 0);
 }
 
 static inline void
 kmem_cache_destroy(struct kmem_cache *c)
 {
-	uma_zdestroy(c->cache_zone);
-	free(c, M_KMALLOC);
+	delete_object_cache(c->cache);
+	free(c);
 }
 
 #endif	/* _LINUX_SLAB_H_ */
