@@ -90,7 +90,7 @@ struct file_operations {
 
 extern int register_chrdev(unsigned int major, const char* name,
 	const struct file_operations* ops);
-extern int unregister_chrdev(unsigned int major, const char* name);
+extern void unregister_chrdev(unsigned int major, const char* name);
 
 static inline int
 register_chrdev_region(dev_t dev, unsigned range, const char*name)

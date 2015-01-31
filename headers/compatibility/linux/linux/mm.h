@@ -35,11 +35,11 @@
 #define PAGE_ALIGN(addr) round_page(addr)
 
 struct vm_area_struct {
-	vm_offset_t	vm_start;
-	vm_offset_t	vm_end;
-	vm_offset_t	vm_pgoff;
-	vm_paddr_t	vm_pfn;		/* PFN For mmap. */
-	vm_memattr_t	vm_page_prot;
+	uintptr_t vm_start;
+	uintptr_t vm_end;
+	uintptr_t vm_pgoff;
+	phys_addr_t vm_pfn;		/* PFN For mmap. */
+	uintptr_t vm_page_prot;
 };
 
 /*
@@ -63,6 +63,7 @@ get_order(unsigned long size)
 /*
  * This only works via mmap ops.
  */
+#if 0
 static inline int
 io_remap_pfn_range(struct vm_area_struct *vma,
     unsigned long addr, unsigned long pfn, unsigned long size,
@@ -73,5 +74,6 @@ io_remap_pfn_range(struct vm_area_struct *vma,
 
 	return (0);
 }
+#endif
 
 #endif	/* _LINUX_MM_H_ */

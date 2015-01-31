@@ -32,12 +32,11 @@
 #include <linux/bitops.h>
 #include <linux/compiler.h>
 #include <linux/log2.h>
-#include <linux/slab.h>
 #include <linux/types.h>
 
 #include <stdarg.h>
-#include <stdio.h>
 
+#define PAGE_SHIFT 12
 
 #define KERN_CONT       ""
 #define	KERN_EMERG	"<0>"
@@ -191,39 +190,8 @@ typedef struct pm_message {
 #define DIV_ROUND_CLOSEST(x, divisor)	(((x) + ((divisor) /2)) / (divisor))
 
 
-static inline char *kvasprintf(gfp_t gfp, const char *fmt, va_list ap)
-{
-	unsigned int len;
-	char *p = NULL;
-	va_list aq;
-
-	__va_copy(aq, ap);
-	len = vsnprintf(NULL, 0, fmt, aq);
-	va_end(aq);
-
-	if (len < 0)
-		return NULL;
-
-	p = kmalloc(len + 1, gfp);
-	if (p == NULL)
-		return NULL;
-
-	vsnprintf(p, len + 1, fmt, ap);
-
-	return p;
-}
-
-static inline char *kasprintf(gfp_t gfp, const char *fmt, ...)
-{
-	va_list ap;
-	char *p;
-
-	va_start(ap, fmt);
-	p = kvasprintf(gfp, fmt, ap);
-	va_end(ap);
-
-	return p;
-}
+extern char* kvasprintf(gfp_t gfp, const char* fmt, va_list ap);
+extern char* kasprintf(gfp_t gfp, const char* fmt, ...);
 
 
 #endif	/* _LINUX_KERNEL_H_ */

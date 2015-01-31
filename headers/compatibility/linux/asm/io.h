@@ -28,7 +28,6 @@
 #ifndef _ASM_IO_H_
 #define _ASM_IO_H_
 
-#include <machine/pmap.h>
 
 #define ioread8(addr)		*(volatile uint8_t *)((char *)addr)
 #define ioread16(addr)		*(volatile uint16_t *)((char *)addr)
@@ -38,10 +37,11 @@
 #define iowrite16(data, addr)	*(volatile uint16_t *)((char *)addr) = data;
 #define iowrite32(data, addr)	*(volatile uint32_t *)((char *)addr) = data;
 
-static inline void __iomem *map_common(resource_size_t addr, unsigned long size, uint32 flags)
+static inline void __iomem *map_common(resource_size_t addr, unsigned long size,
+	uint32 flags)
 {
 	void* address;
-	area_id area = map_physical_memory("lio", offset, size, flags,
+	area_id area = map_physical_memory("lio", addr, size, flags,
 		B_READ_AREA | B_WRITE_AREA, &address);
 	if (area < 0)
 		return NULL;

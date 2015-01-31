@@ -55,7 +55,9 @@ page_address(struct page *page)
 {
 	return page->address;
 }
-/*
+
+#if 0
+
 static inline unsigned long
 _get_page(gfp_t mask)
 {
@@ -92,7 +94,7 @@ __free_page(struct page *m)
 		    m);
 	kmem_free(kmem_arena, (vm_offset_t)page_address(m), PAGE_SIZE);
 }
-/*
+
 static inline void
 __free_pages(struct page *m, unsigned int order)
 {
@@ -108,7 +110,7 @@ __free_pages(struct page *m, unsigned int order)
  * Alloc pages allocates directly from the buddy allocator on linux so
  * order specifies a power of two bucket of pages and the results
  * are expected to be aligned on the size as well.
- *//*
+ */
 static inline struct page*
 alloc_pages(gfp_t gfp_mask, unsigned int order)
 {
@@ -127,5 +129,7 @@ alloc_pages(gfp_t gfp_mask, unsigned int order)
 #define alloc_pages_node(node, mask, order)     alloc_pages(mask, order)
 
 #define kmalloc_node(chunk, mask, node)         kmalloc(chunk, mask)
-*/
+
+#endif
+
 #endif	/* _LINUX_GFP_H_ */

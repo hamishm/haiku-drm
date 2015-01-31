@@ -34,6 +34,9 @@
 #include <linux/list.h>
 #include <linux/slab.h>
 
+#include <stdio.h>
+
+
 struct kobject;
 
 

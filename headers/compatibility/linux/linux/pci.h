@@ -38,6 +38,7 @@
 
 #define PCI_ANY_ID	(~0u)
 
+struct pci_driver;
 
 struct pci_dev {
 	uint16 vendor;
@@ -47,9 +48,10 @@ struct pci_dev {
 	uint32 class;
 
 	// Private
-	struct pci_device* device;
+	struct pci_device* dev;
 	struct pci_device_module_info* module;
-	struct pci_device_id* found_id;
+	struct pci_device_id* matching_id;
+	struct pci_driver* driver;
 	struct device_node* node;
 };
 
@@ -117,42 +119,42 @@ extern int pci_register_driver(struct pci_driver* driver);
 static inline int
 pci_read_config_byte(struct pci_dev *pdev, int where, u8 *val)
 {
-	*val = (u16)pci_read_config(pdev->dev, where, 1);
+	*val = (u16)pdev->module->read_pci_config(pdev->dev, where, 1);
 	return 0;
 }
 
 static inline int
 pci_read_config_word(struct pci_dev *pdev, int where, u16 *val)
 {
-	*val = (u16)pci_read_config(pdev->dev, where, 2);
+	*val = (u16)pdev->module->read_pci_config(pdev->dev, where, 2);
 	return 0;
 }
 
 static inline int
 pci_read_config_dword(struct pci_dev *pdev, int where, u32 *val)
 {
-	*val = (u32)pci_read_config(pdev->dev, where, 4);
+	*val = (u32)pdev->module->read_pci_config(pdev->dev, where, 4);
 	return 0;
 }
 
 static inline int
 pci_write_config_byte(struct pci_dev *pdev, int where, u8 val)
 {
-	pci_write_config(pdev->dev, where, val, 1);
+	pdev->module->write_pci_config(pdev->dev, where, val, 1);
 	return 0;
 }
 
 static inline int
 pci_write_config_word(struct pci_dev *pdev, int where, u16 val)
 {
-	pci_write_config(pdev->dev, where, val, 2);
+	pdev->module->write_pci_config(pdev->dev, where, val, 2);
 	return 0;
 }
 
 static inline int
 pci_write_config_dword(struct pci_dev *pdev, int where, u32 val)
 {
-	pci_write_config(pdev->dev, where, val, 4);
+	pdev->module->write_pci_config(pdev->dev, where, val, 4);
 	return 0;
 }
 

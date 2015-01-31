@@ -28,26 +28,21 @@
 #ifndef	_LINUX_SCHED_H_
 #define	_LINUX_SCHED_H_
 
-#include <KernelExport.h>
 
-#define	TASK_RUNNING		0
-#define	TASK_INTERRUPTIBLE	1
-#define	TASK_UNINTERRUPTIBLE	2
+#define	TASK_RUNNING			~0UL
+#define	TASK_UNINTERRUPTIBLE	0
+#define	TASK_INTERRUPTIBLE		B_CAN_INTERRUPT
+#define TASK_KILLABLE			B_KILL_CAN_INTERRUPT
+
+#define MAX_SCHEDULE_TIMEOUT	B_INFINITE_TIMEOUT
 
 /*
  * schedule_timeout - sleep until timeout
  * @timeout: timeout value in jiffies
  */
-static inline long
-schedule_timeout(signed long timeout)
-{
-	if (timeout < 0) {
-		kprintf("schedule_timeout(): timeout cannot be negative\n");
-		return 0;
-	}
+extern long schedule_timeout(long timeout);
 
-	snooze(timeout);
-	return 0;
-}
+extern void schedule();
+
 
 #endif	/* _LINUX_SCHED_H_ */

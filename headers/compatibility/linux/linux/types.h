@@ -32,7 +32,6 @@
 #include <linux/compiler.h>
 #include <asm/types.h>
 
-typedef uint64 u64;
 
 typedef uint16 __le16;
 typedef uint16 __be16;
@@ -40,7 +39,7 @@ typedef uint32 __le32;
 typedef uint32 __be32;
 typedef uint64 __le64;
 typedef uint64 __be64;
-#ifndef __bool_true_false_are_defined
+#if !defined(__bool_true_false_are_defined) && !defined(__cplusplus)
 typedef _Bool bool;
 #define	true	TRUE
 #define	false	FALSE

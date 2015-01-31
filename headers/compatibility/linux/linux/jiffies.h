@@ -27,9 +27,6 @@
 #ifndef _LINUX_JIFFIES_H_
 #define _LINUX_JIFFIES_H_
 
-#include <sys/kernel.h>
-#include <machine/limits.h>
-
 #include <linux/math64.h>
 #include <linux/time.h>
 

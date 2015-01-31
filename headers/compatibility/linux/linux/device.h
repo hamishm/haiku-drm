@@ -38,12 +38,15 @@
 #include <linux/workqueue.h>
 #include <linux/sysfs.h>
 #include <linux/kdev_t.h>
-#include <asm/atomic.h>
 
-#include <sys/bus.h>
+#include <stdio.h>
+
 
 enum irqreturn	{ IRQ_NONE = 0, IRQ_HANDLED, IRQ_WAKE_THREAD, };
 typedef enum irqreturn	irqreturn_t;
+
+struct device;
+
 
 struct class {
 	const char* name;
@@ -75,9 +78,13 @@ struct device {
 	struct device_node* node;
 };
 
+
+struct device_driver {
+};
+
 // TODO
 //extern struct device linux_rootdev;
-//extern struct kobject class_root;
+extern struct kobject class_root;
 
 
 struct class_attribute {
@@ -282,8 +289,8 @@ static struct kobj_type dev_ktype = {
 };
 
 
-extern void device_initialize(struct device* dev)
-extern int device_register(struct device* dev)
+extern void device_initialize(struct device* dev);
+extern int device_register(struct device* dev);
 extern void device_unregister(struct device* dev);
 
 extern struct device* device_create(struct class* class, struct device* parent,
@@ -292,18 +299,18 @@ extern void device_destroy(struct class *class, dev_t devt);
 
 
 static inline void
-class_kfree(struct class *class)
+class_kfree(struct class* class)
 {
 	kfree(class);
 }
 
-static inline struct class *
-class_create(struct module *owner, const char *name)
+static inline struct class*
+class_create(struct module* owner, const char* name)
 {
-	struct class *class;
+	struct class* class;
 	int error;
 
-	class = kzalloc(sizeof(*class), M_WAITOK);
+	class = kzalloc(sizeof(*class), GFP_KERNEL);
 	class->owner = owner;
 	class->name= name;
 	class->class_release = class_kfree;

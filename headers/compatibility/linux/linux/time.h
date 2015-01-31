@@ -30,7 +30,7 @@
 #define NSEC_PER_USEC	1000L
 #define NSEC_PER_SEC	1000000000L
 
-#include <time.h>
+#include <sys/time.h>
 
 
 static inline struct timeval
@@ -62,20 +62,6 @@ timeval_to_ns(const struct timeval *tv)
 		tv->tv_usec * NSEC_PER_USEC;
 }
 
-#define getrawmonotonic(ts)	nanouptime(ts)
-
-static inline struct timespec
-timespec_sub(struct timespec lhs, struct timespec rhs)
-{
-	struct timespec ts;
-
-	ts.tv_sec = lhs.tv_sec;
-	ts.tv_nsec = lhs.tv_nsec;
-	timespecsub(&ts, &rhs);
-
-	return ts;
-}
-
 static inline void
 set_normalized_timespec(struct timespec *ts, time_t sec, int64_t nsec)
 {
@@ -89,8 +75,17 @@ set_normalized_timespec(struct timespec *ts, time_t sec, int64_t nsec)
 		nsec = (nsec % NSEC_PER_SEC) + NSEC_PER_SEC;
 	}
 
-	ts.tv_sec = sec;
-	ts.tv_nsec = nsec;
+	ts->tv_sec = sec;
+	ts->tv_nsec = nsec;
+}
+
+static inline struct timespec
+timespec_sub(struct timespec lhs, struct timespec rhs)
+{
+	struct timespec ts;
+	set_normalized_timespec(&ts, lhs.tv_sec - rhs.tv_sec,
+		lhs.tv_nsec - rhs.tv_nsec);
+	return ts;
 }
 
 static inline int64_t
@@ -133,14 +128,16 @@ timespec_valid(const struct timespec *ts)
 static inline void
 getrawmonotonic(struct timespec *ts)
 {
-	bigtime_t nsec = system_time_nsec();
-	ts.tv_sec = nsec / NSEC_PER_SEC;
+	uint32_t rem;
+	bigtime_t nsec = system_time_nsecs();
+
+	ts->tv_sec = nsec / NSEC_PER_SEC;
 	rem = nsec % NSEC_PER_SEC;
 	if (rem < 0) {
-		ts.tv_sec--;
+		ts->tv_sec--;
 		rem += NSEC_PER_SEC;
 	}
-	ts.tv_nsec = rem;
+	ts->tv_nsec = rem;
 }
 
 #endif	/* _LINUX_TIME_H_ */

@@ -41,6 +41,8 @@ INIT_LIST_HEAD(struct list_head *list)
 {
 	list->next = list->prev = list;
 }
+
+#define LIST_HEAD_INIT(list) { &(list), &(list) }
  
 static inline int
 list_empty(const struct list_head *head)
@@ -122,17 +124,17 @@ list_del_init(struct list_head *entry)
 #define	list_for_each_prev(p, h) for (p = (h)->prev; p != (h); p = p->prev)
 
 static inline void
-list_add(struct list_head *new, struct list_head *head)
+list_add(struct list_head *entry, struct list_head *head)
 {
 
-	_list_add(new, head, head->next);
+	_list_add(entry, head, head->next);
 }
 
 static inline void
-list_add_tail(struct list_head *new, struct list_head *head)
+list_add_tail(struct list_head *entry, struct list_head *head)
 {
 
-	_list_add(new, head->prev, head);
+	_list_add(entry, head->prev, head);
 }
 
 static inline void

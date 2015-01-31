@@ -30,7 +30,10 @@
 #ifndef	_LINUX_IDR_H_
 #define	_LINUX_IDR_H_
 
-#include <sys/kernel.h>
+#include <lock.h>
+#include <linux/types.h>
+
+#define NBBY		8
 
 #define	IDR_BITS	5
 #define	IDR_SIZE	(1 << IDR_BITS)
@@ -46,21 +49,21 @@
 #define MAX_IDR_MASK (MAX_IDR_BIT - 1)
 
 struct idr_layer {
-	unsigned long		bitmap;
-	struct idr_layer	*ary[IDR_SIZE];
+	unsigned long bitmap;
+	struct idr_layer* ary[IDR_SIZE];
 };
 
 struct idr {
-	struct mtx		lock;
-	struct idr_layer	*top;
-	struct idr_layer	*free;
-	int			layers;
+	mutex lock;
+	struct idr_layer* top;
+	struct idr_layer* avail;
+	int layers;
 };
 
 #define DEFINE_IDR(name)						\
-	struct idr name;						\
-	SYSINIT(name##_idr_sysinit, SI_SUB_DRIVERS, SI_ORDER_FIRST,	\
-	    idr_init, &(name));
+	struct idr name = {							\
+		.lock = MUTEX_INITIALIZER("linux idr")	\
+	};
 
 void	*idr_find(struct idr *idp, int id);
 int	idr_pre_get(struct idr *idp, gfp_t gfp_mask);
@@ -71,5 +74,6 @@ void	idr_remove(struct idr *idp, int id);
 void	idr_remove_all(struct idr *idp);
 void	idr_destroy(struct idr *idp);
 void	idr_init(struct idr *idp);
+int		idr_alloc(struct idr* idr, void* ptr, int start, int end, gfp_t mask);
 
 #endif	/* _LINUX_IDR_H_ */

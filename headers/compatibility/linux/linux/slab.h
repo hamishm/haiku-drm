@@ -69,7 +69,7 @@ struct kmem_cache {
 #define	SLAB_HWCACHE_ALIGN	0x0001
 
 
-static inline int
+static inline status_t
 kmem_ctor(void* cookie, void* object)
 {
 	void (*ctor)(void *) = cookie;
@@ -82,10 +82,10 @@ static inline struct kmem_cache *
 kmem_cache_create(char *name, size_t size, size_t align, u_long flags,
     void (*ctor)(void *))
 {
-	struct kmem_cache *c = malloc(sizeof(struct kmem_cache));
+	struct kmem_cache *c = (struct kmem_cache*)malloc(sizeof(struct kmem_cache));
 
-	c->cache = create_object_cache(name, size, align, ctor,
-		ctor != NULL ? (void*)kmem_ctor : NULL, NULL);
+	c->cache = create_object_cache(name, size, align,
+		ctor != NULL ? (void*)kmem_ctor : NULL, kmem_ctor, NULL);
 	return c;
 }
 

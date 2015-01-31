@@ -101,19 +101,19 @@ del_timer(struct timer_list *timer)
 static inline unsigned long
 round_jiffies(unsigned long j)
 {
-	return roundup(j, hz);
+	return j;
 }
 
 static inline unsigned long
 round_jiffies_up(unsigned long j)
 {
-	return roundup(j, hz);
+	return j;
 }
 
 static inline unsigned long
 round_jiffies_up_relative(unsigned long j)
 {
-	return roundup(j, hz);
+	return j;
 }
 
 #endif /* _LINUX_TIMER_H_ */
