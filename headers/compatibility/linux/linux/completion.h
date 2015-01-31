@@ -27,7 +27,6 @@
 #ifndef	_LINUX_COMPLETION_H_
 #define	_LINUX_COMPLETION_H_
 
-#include <compat/condvar.h>
 #include <linux/wait.h>
 
 struct completion {
@@ -44,66 +43,33 @@ init_completion(struct completion *c)
 
 #define	INIT_COMPLETION(c)	(c.done = 0)
 
-/*
- * Completion interlock and wakeup.  Be careful not to execute the wakeup
- * from inside the spinlock as this can deadlock if the IPIQ fifo is full.
- * (also note that wakeup() is asynchronous anyway, so no point doing that).
- */
 static inline void
 complete(struct completion *c)
 {
-	mutex_lock(&c->wait.lock);
+	acquire_spinlock(&c->wait.lock);
 	c->done++;
-	mutex_unlock(&c->wait.lock);
-	wakeup_one(&c->wait);
+	release_spinlock(&c->wait.lock);
+	wake_up(&c->wait);
 }
 
 static inline void
 complete_all(struct completion *c)
 {
-	mutex_lock(&c->wait.lock);
+	acquire_spinlock(&c->wait.lock);
 	c->done++;
-	mutex_unlock(&c->wait.lock);
-	wakeup(&c->wait);
+	release_spinlock(&c->wait.lock);
+	wake_up_all(&c->wait);
 }
 
-static inline long
-wait_for_completion_interruptible_timeout(struct completion *c,
-		unsigned long timeout)
-{
-	int start_jiffies, elapsed_jiffies, remaining_jiffies;
-	bool timeout_expired = false, awakened = false;
-	long ret = 1;
+extern long __wait_for_completion(struct completion* c, int state, long timeout);
 
-	start_jiffies = ticks;
-
-	mutex_lock(&c->wait.lock);
-	while (c->done == 0 && !timeout_expired) {
-		ret = cv_wait(&c->wait, &c->wait.lock, B_CAN_INTERRUPT, "wfcit", timeout);
-		switch(ret) {
-		case B_TIMED_OUT:
-		case B_WOULD_BLOCK:
-			timeout_expired = true;
-			ret = 0;
-			break;
-		case B_INTERRUPTED:
-			ret = ERESTARTSYS;
-			break;
-		case 0:
-			awakened = true;
-			break;
-		}
-	}
-	mutex_unlock(&c->wait.lock);
-
-	if (awakened) {
-		elapsed_jiffies = ticks - start_jiffies;
-		remaining_jiffies = timeout - elapsed_jiffies;
-		if (remaining_jiffies > 0)
-			ret = remaining_jiffies;
-	}
-
-	return ret;
-}
+#define wait_for_completion(c)							\
+	__wait_for_completion(c, TASK_UNINTERRUPTIBLE, MAX_SCHEUDLE_TIMEOUT)
+#define wait_for_completion_interruptible(c) 			\
+	__wait_for_completion(c, TASK_INTERRUPTIBLE, MAX_SCHEUDLE_TIMEOUT)
+#define wait_for_completion_timeout(c, t)				\
+	__wait_for_completion(c, TASK_UNINTERRUPTIBLE, t)
+#define wait_for_completion_interruptible_timeout(c, t)	\
+	__wait_for_completion(c, TASK_INTERRUPTIBLE, t)
 
 #endif	/* _LINUX_COMPLETION_H_ */
