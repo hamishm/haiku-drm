@@ -1,0 +1,46 @@
+SubDir HAIKU_TOP src add-ons kernel drivers graphics drm ;
+
+UsePrivateHeaders [ FDirName graphics drm ] ;
+UsePrivateHeaders [ FDirName graphics drm uapi ] ;
+UseHeaders [ FDirName $(HAIKU_TOP) headers compatibility linux ] : true ;
+
+UsePrivateKernelHeaders ;
+UseHeaders $(HAIKU_PRIVATE_KERNEL_HEADERS) : true ;
+
+SubDirCcFlags [ FDefines _KERNEL=1 B_USE_POSITIVE_POSIX_ERRORS=1 __KERNEL__=1 ] ;
+
+KernelStaticLibrary drm.a :
+	drm_auth.c
+	drm_bufs.c
+	drm_cache.c
+	drm_context.c
+	drm_dma.c
+	drm_fops.c
+	drm_gem.c
+	drm_ioctl.c
+	drm_irq.c
+	drm_lock.c
+	drm_memory.c
+	drm_drv.c
+	drm_vm.c
+	drm_agpsupport.c
+	drm_scatter.c
+	drm_pci.c
+	drm_platform.c
+	drm_sysfs.c
+	drm_hashtab.c
+	drm_mm.c
+	drm_crtc.c
+	drm_modes.c
+	drm_edid.c
+	drm_info.c
+	drm_debugfs.c
+	drm_encoder_slave.c
+	drm_trace_points.c
+	drm_global.c
+	drm_prime.c
+	drm_rect.c
+	drm_vma_manager.c
+	drm_flip_work.c
+	drm_modeset_lock.c
+;
