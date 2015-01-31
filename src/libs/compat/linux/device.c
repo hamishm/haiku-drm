@@ -27,15 +27,20 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
+#include <linux/cdev.h>
 #include <linux/device.h>
-#include <linux/pci.h>
+#include <linux/fs.h>
 #include <linux/list.h>
+#include <linux/pci.h>
+#include <linux/slab.h>
 
+#include <debug.h>
 #include <driver.h>
 
 #define ALL_MINORS 255
 
-static struct list_head cdev_list = INIT_LIST_HEAD(&cdev_list);
+
+static struct list_head cdev_list = LIST_HEAD_INIT(cdev_list);
 
 
 static void
@@ -84,21 +89,23 @@ device_create(struct class* class, struct device* parent, dev_t devt,
 int
 device_register(struct device *dev)
 {
+	status_t status;
+
 	device_attr attrs[] = {
 		{B_DEVICE_PRETTY_NAME, B_STRING_TYPE,
 			{string: dev_name(dev)}
 		},
 		{LINUX_DEVICE_MAJOR, B_UINT32_TYPE,
-			{uint32: MAJOR(dev->devt)}
+			{ui32: MAJOR(dev->devt)}
 		},
 		{LINUX_DEVICE_MINOR, B_UINT32_TYPE,
-			{uint32: MINOR(dev->devt)}
+			{ui32: MINOR(dev->devt)}
 		},
 		{NULL}
 	};
 
-	status_t status = dev_manager->register_node(dev->parent->node,
-		LINUX_DRIVER_MODULE, &attrs. NULL, &dev->node);
+	status = dev_manager->register_node(dev->parent->node,
+		LINUX_DEVICE_DRIVER_MODULE, attrs, NULL, &dev->node);
 	if (status != B_OK)
 		return status;
 
@@ -151,7 +158,7 @@ int register_chrdev(unsigned int major, const char* name,
 	if (cdev == NULL)
 		return -ENOMEM;
 
-	cdev->owner = ops-owner;
+	cdev->owner = ops->owner;
 	cdev->ops = ops;
 	kobject_set_name(&cdev->kobj, name);
 
@@ -162,7 +169,7 @@ int register_chrdev(unsigned int major, const char* name,
 
 void unregister_chrdev(unsigned int major, const char* name)
 {
-	struct cdev* cdev, temp;
+	struct cdev *cdev, *temp;
 	list_for_each_entry_safe(cdev, temp, &cdev_list, entry) {
 		if (MAJOR(cdev->dev) == major && cdev->count == ALL_MINORS) {
 			cdev_del(cdev);
@@ -177,11 +184,12 @@ void unregister_chrdev(unsigned int major, const char* name)
 static struct inode*
 get_device_inode(dev_t dev)
 {
+	struct inode* inode;
 	struct cdev* cdev = cdev_find_device(dev);
 	if (cdev == NULL)
 		return NULL;
 
-	struct inode* inode = kzmalloc(sizeof(inode), GFP_KERNEL);
+	inode = kzalloc(sizeof(inode), GFP_KERNEL);
 	if (inode == NULL)
 		return NULL;
 
@@ -196,8 +204,10 @@ get_device_inode(dev_t dev)
 static status_t
 linux_device_init_driver(device_node* node, void** _driverCookie)
 {
+	struct inode* inode;
 	uint32 major;
 	uint32 minor;
+
 	status_t status = dev_manager->get_attr_uint32(node, LINUX_DEVICE_MAJOR,
 		&major, false);
 	if (status != B_OK)
@@ -208,11 +218,11 @@ linux_device_init_driver(device_node* node, void** _driverCookie)
 	if (status != B_OK)
 		return status;
 
-	struct inode* inode = get_device_inode(MKDEV(major, minor));
+	inode = get_device_inode(MKDEV(major, minor));
 	if (inode == NULL)
 		return B_ERROR;
 
-	*driverCookie = (void*)inode;
+	*_driverCookie = (void*)inode;
 	return B_OK;
 }
 
@@ -228,6 +238,7 @@ static status_t
 linux_device_init_device(void* driverCookie, void** _deviceCookie)
 {
 	*_deviceCookie = driverCookie;
+	return B_OK;
 }
 
 static void
@@ -236,9 +247,9 @@ linux_device_uninit_device(void* deviceCookie)
 }
 
 
-const struct driver_module_info linux_compat_dev_driver = {
+const struct driver_module_info linux_device_driver = {
 	{
-		LINUX_DEV_DRIVER_MODULE,
+		LINUX_DEVICE_DRIVER_MODULE,
 		0,
 		NULL
 	},
@@ -253,15 +264,73 @@ const struct driver_module_info linux_compat_dev_driver = {
 
 
 
-const struct device_module_info linux_device_module = {
+
+
+static status_t
+linux_device_open(void* deviceCookie, const char* path, int openMode,
+	void** _cookie)
+{
+	*_cookie = deviceCookie;
+	return B_OK;
+}
+
+static status_t
+linux_device_close(void* cookie)
+{
+	return B_OK;
+}
+
+static status_t
+linux_device_free(void* cookie)
+{
+	return B_OK;
+}
+
+static status_t
+linux_device_read(void* cookie, off_t position, void* buffer,
+	size_t* _length)
+{
+	return B_BAD_VALUE;
+}
+
+static status_t
+linux_device_write(void* cookie, off_t position, const void* data,
+	size_t* _length)
+{
+	return B_BAD_VALUE;
+}
+
+static status_t
+linux_device_control(void* cookie, uint32 op, void* buffer,
+	size_t length)
+{
+	return B_BAD_VALUE;
+}
+
+static status_t
+linux_device_select(void* cookie, uint8 event, selectsync* sync)
+{
+	return B_BAD_VALUE;
+}
+
+static status_t
+linux_device_deselect(void* cookie, uint8 event, selectsync* sync)
+{
+	return B_BAD_VALUE;
+}
+
+
+
+
+const struct device_module_info linux_char_device = {
 	{
-		LINUX_DEVICE_MODULE,
+		LINUX_CHAR_DEVICE_MODULE,
 		0,
 		NULL
 	},
 
-	linux_device_init,
-	linux_device_uninit,
+	linux_device_init_device,
+	linux_device_uninit_device,
 	NULL,
 
 	linux_device_open,
@@ -274,5 +343,5 @@ const struct device_module_info linux_device_module = {
 
 	linux_device_control,
 	linux_device_select,
-	linux_device_deselect;
+	linux_device_deselect
 };

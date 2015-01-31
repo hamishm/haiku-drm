@@ -26,12 +26,15 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-
 #include <linux/idr.h>
-
-#include <malloc.h>
 #include <linux/bitops.h>
+#include <linux/err.h>
+#include <linux/gfp.h>
+#include <linux/slab.h>
 
+#include <debug.h>
+#include <lock.h>
+#include <malloc.h>
 
 /*
  * IDR Implementation.
@@ -58,7 +61,7 @@ void
 idr_init(struct idr *idr)
 {
 	bzero(idr, sizeof(*idr));
-	mutex_init(&idr->lock);
+	mutex_init(&idr->lock, "linux idr");
 }
 
 /* Only frees cached pages. */
@@ -69,9 +72,9 @@ idr_destroy(struct idr *idr)
 
 	idr_remove_all(idr);
 	mutex_lock(&idr->lock);
-	for (il = idr->free; il != NULL; il = iln) {
+	for (il = idr->avail; il != NULL; il = iln) {
 		iln = il->ary[0];
-		free(il, M_IDR);
+		free(il);
 	}
 	mutex_unlock(&idr->lock);
 }
@@ -84,7 +87,7 @@ idr_remove_layer(struct idr_layer *il, int layer)
 	if (il == NULL)
 		return;
 	if (layer == 0) {
-		free(il, M_IDR);
+		free(il);
 		return;
 	}
 	for (i = 0; i < IDR_SIZE; i++)
@@ -207,16 +210,16 @@ idr_pre_get(struct idr *idr, gfp_t gfp_mask)
 	struct idr_layer *head;
 	int need;
 
-	mtx_lock(&idr->lock);
+	mutex_lock(&idr->lock);
 	for (;;) {
 		need = idr->layers + 1;
-		for (il = idr->free; il != NULL; il = il->ary[0])
+		for (il = idr->avail; il != NULL; il = il->ary[0])
 			need--;
 		mutex_unlock(&idr->lock);
 		if (need == 0)
 			break;
 		for (head = NULL; need; need--) {
-			iln = calloc(sizeof(*il)); // XXX
+			iln = kzalloc(sizeof(*il), gfp_mask);
 			if (iln == NULL)
 				break;
 			bitmap_fill(&iln->bitmap, IDR_SIZE);
@@ -228,9 +231,9 @@ idr_pre_get(struct idr *idr, gfp_t gfp_mask)
 		}
 		if (head == NULL)
 			return (0);
-		mtx_lock(&idr->lock);
-		il->ary[0] = idr->free;
-		idr->free = head;
+		mutex_lock(&idr->lock);
+		il->ary[0] = idr->avail;
+		idr->avail = head;
 	}
 	return (1);
 }
@@ -240,13 +243,13 @@ idr_get(struct idr *idr)
 {
 	struct idr_layer *il;
 
-	il = idr->free;
+	il = idr->avail;
 	if (il) {
-		idr->free = il->ary[0];
+		idr->avail = il->ary[0];
 		il->ary[0] = NULL;
 		return (il);
 	}
-	il = calloc(sizeof(*il));
+	il = kzalloc(sizeof(*il), GFP_KERNEL);
 	bitmap_fill(&il->bitmap, IDR_SIZE);
 	return (il);
 }
@@ -291,7 +294,7 @@ idr_get_new(struct idr *idr, void *ptr, int *idp)
 	 */
 	for (layer = idr->layers - 1;; layer--) {
 		stack[layer] = il;
-		idx = ffsl(il->bitmap);
+		idx = il->bitmap ? __ffsl(il->bitmap) + 1 : 0;
 		if (idx == 0)
 			panic("idr_get_new: Invalid leaf state (%p, %p)\n",
 			    idr, il);
@@ -447,7 +450,7 @@ int idr_alloc(struct idr *idr, void *ptr, int start, int end, gfp_t gfp_mask)
 		return result;
 
 	if (id >= end) {
-		idr_remove(id);
+		idr_remove(idr, id);
 		return -ENOSPC;
 	}
 
