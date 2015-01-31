@@ -32,18 +32,24 @@
 #include <linux/list.h>
 #include <linux/types.h>
 #include <linux/kernel.h>
-#include <linux/timer.h>
+
+#include <KernelExport.h>
+
+
+extern int32 smp_get_num_cpus(void);
 
 
 struct workqueue_struct;
+struct work_struct;
 
-typedef void (*work_func_t)(struct work_struct *work);
+typedef void (*work_func_t)(struct work_struct* work);
 
 struct work_struct {
 	struct workqueue_struct* queue;
 	struct list_head list;
 	bool linked;
 	work_func_t fn;
+	long data;
 };
 
 struct delayed_work {
@@ -52,10 +58,11 @@ struct delayed_work {
 };
 
 
+
 #define	INIT_WORK(work, func) 	 			\
 do {										\
 	(work)->fn = (func);					\
-	(work)->taskqueue = NULL;				\
+	(work)->queue = NULL;					\
 	INIT_LIST_HEAD(&(work)->list);			\
 } while (0)
 
@@ -92,12 +99,12 @@ extern struct workqueue_struct * _workqueue_create(const char* name,
 
 static inline struct workqueue_struct *
 create_singlethread_workqueue(const char *name) {
-	return common_create_workqueue(name, 1);
+	return _workqueue_create(name, 1);
 }
 
 static inline struct workqueue_struct *
 create_workqueue(const char *name) {
-	return common_create_workqueue(name, smp_get_num_cpus());
+	return _workqueue_create(name, smp_get_num_cpus());
 }
 
 extern void destroy_workqueue(struct workqueue_struct *wq);

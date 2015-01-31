@@ -5,12 +5,17 @@
 
 extern "C" {
 #include <linux/wait.h>
+#include <linux/kernel.h>
 #include <linux/list.h>
+#include <linux/sched.h>
 }
 
 #include <KernelExport.h>
 #include <thread.h>
 #include <util/AutoLock.h>
+
+
+#define __WQ_FLAG_INTERRUPTIBLE 0x02
 
 
 extern "C" {
@@ -36,11 +41,9 @@ autoremove_wake_function(wait_queue_t* waiter, unsigned int mode, int sync,
 
 
 void
-__waitqueue_wake(wait_queue_head_t* queue, int count, unsigned int mode,
+__waitqueue_wake_locked(wait_queue_head_t* queue, int count, unsigned int mode,
 	void* key)
 {
-	acquire_spinlock(&queue->lock);
-
 	int woken = 0;
 
 	wait_queue_t *entry, *temp;
@@ -53,44 +56,26 @@ __waitqueue_wake(wait_queue_head_t* queue, int count, unsigned int mode,
 			break;
 		}
 	}
-
-	release_spinlock(&queue->lock);
 }
 
 
 static void
-__waitqueue_prepare(wait_queue_head_t* queue, wait_queue_t* waiter, int state, bool exclusive)
+__waitqueue_prepare_locked(wait_queue_head_t* queue, wait_queue_t* waiter, int state, bool exclusive)
 {
-	acquire_spinlock(&queue->lock);
-
 	if (exclusive)
 		list_add_tail(&waiter->entry, &queue->waiters);
 	else
 		list_add(&waiter->entry, &queue->waiters);
 
-	waiter->flags = exclusive ? WQ_WAIT_EXCLUSIVE : 0;
 	ASSERT(waiter->thread == NULL);
 
-	Thread* thread = thread_get_current();
+	Thread* thread = thread_get_current_thread();
 	waiter->thread = (void*)thread;
-	waiter->flags = flags;
+	waiter->flags = (exclusive ? WQ_FLAG_EXCLUSIVE : 0) |
+		(state == TASK_INTERRUPTIBLE ? __WQ_FLAG_INTERRUPTIBLE : 0);
 
-	thread_prepare_to_block(thread, state == TASK_INTERRUPTIBLE ?
-		B_CAN_INTERRUPT : 0, THREAD_BLOCK_TYPE_OTHER, "linux waitqueue");
-
-	release_spinlock(&queue->lock);
-}
-
-
-void
-finish_wait(wait_queue_head_t* queue, wait_queue_t* waiter)
-{
-	acquire_spinlock(&queue->lock);
-
-	if (!list_empty(&waiter->entry))
-		list_del_init(&waiter->entry);
-
-	release_spinlock(&queue->lock);
+	thread_prepare_to_block(thread, state, THREAD_BLOCK_TYPE_OTHER,
+		"linux waitqueue");
 }
 
 

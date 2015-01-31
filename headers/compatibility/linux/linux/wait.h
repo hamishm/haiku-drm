@@ -30,47 +30,95 @@
 #define _LINUX_WAIT_H_
 
 #include <KernelExport.h>
-
-#include <compat/condvar.h>
 #include <linux/list.h>
 
 
 #define WQ_FLAG_EXCLUSIVE 0x01
 
+struct _wait_queue;
 
-typedef bool (*wait_queue_func_t)(wait_queue_t* entry, unsigned int mode,
+
+typedef bool (*wait_queue_func_t)(struct _wait_queue* entry, unsigned int mode,
 	int flags, void* key);
 
-/*
-extern int default_wake_function(wait_queue_t* entry, unsigned int mode,
-	int flags, void* key);
-*/
 
-typedef struct {
+typedef struct _wait_queue {
 	struct list_head entry;
 	wait_queue_func_t func;
 	void* thread;
 	int flags;
 } wait_queue_t;
 
-
 typedef struct {
 	spinlock lock;
 	struct list_head waiters;
 } wait_queue_head_t;
 
+	
+static void waitqueue_lock(wait_queue_head_t* queue)
+{
+	acquire_spinlock(&queue->lock);
+}
 
-extern void __waitqueue_wake(wait_queue_head_t* queue, int count,
+static void waitqueue_unlock(wait_queue_head_t* queue)
+{
+	release_spinlock(&queue->lock);
+}
+
+
+/*
+extern int default_wake_function(wait_queue_t* entry, unsigned int mode,
+	int flags, void* key);
+*/
+
+extern bool autoremove_wake_function(wait_queue_t* wait, unsigned int mode, int sync, void* key);
+
+extern void __waitqueue_wake_locked(wait_queue_head_t* queue, int count,
 	unsigned int mode, void* key);
 
-extern void __waitqueue_prepare(wait_queue_head_t* queue, wait_queue_t* waiter,
-	int state, bool exclusive)
+extern void __waitqueue_prepare_locked(wait_queue_head_t* queue, wait_queue_t* waiter,
+	int state, bool exclusive);
+
+
+static void
+__waitqueue_wake(wait_queue_head_t* queue, int count, unsigned int mode,
+	void* key)
+{
+	waitqueue_lock(queue);
+	__waitqueue_wake_locked(queue, count, mode, key);
+	waitqueue_unlock(queue);
+}
+
+
+static void
+__finish_wait_locked(wait_queue_t* waiter)
+{
+	if (!list_empty(&waiter->entry))
+		list_del_init(&waiter->entry);
+}
+
+static void
+finish_wait(wait_queue_head_t* queue, wait_queue_t* waiter)
+{
+	waitqueue_lock(queue);
+	__finish_wait_locked(waiter);
+	waitqueue_unlock(queue);
+}
+
+static void
+__waitqueue_prepare(wait_queue_head_t* queue, wait_queue_t* waiter, int state,
+	bool exclusive)
+{
+	waitqueue_lock(queue);
+	__waitqueue_prepare_locked(queue, waiter, state, exclusive);
+	waitqueue_unlock(queue);
+}
+
+
 
 
 #define prepare_to_wait(q, w, s) __waitqueue_prepare((q), (w), (s), false)
 #define prepare_to_wait_exclusive(q, w, s) __waitqueue_prepare((q), (w), (s), true)
-
-extern void finish_wait(wait_queue_head_t* queue, wait_queue_t* waiter);
 
 #define wake_up(q)						__waitqueue_wake(q, 1, 0, NULL)
 #define wake_up_nr(q, n)				__waitqueue_wake(q, n, 0, NULL)
@@ -87,13 +135,11 @@ extern void abort_exclusive_wait(wait_queue_head_t* queue, wait_queue_t* waiter,
 */
 
 
-extern bool autoremove_wake_function(wait_queue_t* wait, unsigned int mode, int sync, void* key);
-
 
 static inline void
 init_waitqueue_head(wait_queue_head_t* queue)
 {
-	spin_lock_init(&queue->lock);
+	B_INITIALIZE_SPINLOCK(&queue->lock);
 	INIT_LIST_HEAD(&queue->waiters);
 }
 
@@ -105,7 +151,7 @@ init_waitqueue_head(wait_queue_head_t* queue)
 
 #define DEFINE_WAIT_FUNC(wait, fn)					\
 	wait_queue_t (wait) = {							\
-		.entry = LIST_HEAD_INIT(&(wait).entry),		\
+		.entry = LIST_HEAD_INIT((wait).entry),		\
 		.func = (fn),								\
 		.thread = NULL								\
 	}
@@ -130,95 +176,61 @@ waitqueue_active(wait_queue_head_t* queue)
 }
 
 
-#define __wait_event_common(wq, cond, flags, excl)		\
-({														\
-	bool interrupted = false;							\
-	status_t ret = B_OK;								\
-														\
-	DEFINE_WAIT(wait);									\
-	while (1) {											\
-		prepare_to_wait((wq), wait, (flags), (excl));	\
-		if (cond)										\
-			break;										\
-														\
-		ret = thread_block();							\
-		if (ret == B_INTERRUPTED)						\
-			break;										\
-	}													\
-	finish_wait((wq), wait);							\
-	ret;												\
+#define __wait_event(wq, cond, flags, excl)					\
+({															\
+	int ret = 0;											\
+															\
+	DEFINE_WAIT(wait);										\
+	while (1) {												\
+		if (signal_pending_state(flags, current)) {			\
+			ret = -ERESTARTSYS;								\
+			break;											\
+		}													\
+		__waitqueue_prepare((wq), wait, (flags), (excl));	\
+		if (cond)											\
+			break;											\
+															\
+		schedule();											\
+	}														\
+	finish_wait((wq), wait);								\
+	ret;													\
 })
 
 
-/*
- * wait_event_interruptible_timeout:
- * - The process is put to sleep until the condition evaluates to true.
- * - The condition is checked each time the waitqueue wq is woken up.
- * - wake_up has to be called after changing any variable that could change
- * the result of the wait condition.
- *
- * returns:
- *   - 0 if the timeout elapsed
- *   - the remaining jiffies if the condition evaluated to true before
- *   the timeout elapsed.
- *   - remaining jiffies are always at least 1
- *   - -ERESTARTSYS if interrupted by a signal (when PCATCH is set in flags)
-*/
-#define __wait_event_common(wq, condition, timeout_jiffies, flags)	\
-({									\
-	int start_jiffies, elapsed_jiffies, remaining_jiffies, ret;	\
-	bool timeout_expired = false;					\
-	bool interrupted = false;					\
-	long retval;							\
-									\
-	DEFINE_WAIT(wait);				\
-	start_jiffies = ticks;						\
-									\
-	while (1) {							\
-		prepare_to_wait(
-		if (condition)						\
-			break;						\
-									\
-		ret = cv_wait(&wq.condvar, &wq.lock, flags,			\
-					"lwe", timeout_jiffies);	\
-		if (ret == EINTR || ret == ERESTART) {			\
-			interrupted = true;				\
-			break;						\
-		}							\
-		if (ret == EWOULDBLOCK) {				\
-			timeout_expired = true;				\
-			break;						\
-		}							\
-	}								\
-	mutex_unlock(&wq.lock);					\
-									\
-	elapsed_jiffies = ticks - start_jiffies;			\
-	remaining_jiffies = timeout_jiffies - elapsed_jiffies;		\
-	if (remaining_jiffies <= 0)					\
-		remaining_jiffies = 1;					\
-									\
-	if (timeout_expired)						\
-		retval = 0;						\
-	else if (interrupted)						\
-		retval = ERESTARTSYS;					\
-	else if (timeout_jiffies > 0)					\
-		retval = remaining_jiffies;				\
-	else								\
-		retval = 1;						\
-									\
-	retval;								\
+
+#define __wait_event_timeout(wq, cond, flags, excl, timeout)	\
+({																\
+	long ret = timeout;											\
+																\
+	DEFINE_WAIT(wait);											\
+	while (1) {													\
+		if (signal_pending_state(flags, current)) {				\
+			ret = -ERESTARTSYS;									\
+			break;												\
+		}														\
+		__waitqueue_prepare((wq), wait, (flags), (excl));		\
+		if (cond)												\
+			break;												\
+																\
+		ret = schedule_timeout(ret);							\
+		if (ret <= 0)											\
+			break;												\
+	}															\
+	finish_wait((wq), wait);									\
+	ret;														\
 })
 
-#define wait_event(wq, condition)					\
-		__wait_event_common(wq, condition, 0, false)
 
-#define wait_event_interruptible(wq, condition)				\
-		__wait_event_common(wq, condition, TASK_INTERRUPTIBLE, false)
+#define wait_event(wq, cond)											\
+		__wait_event(wq, cond, 0, false)
 
-#define wait_event_timeout(wq, condition, timeout)			\
-		__wait_event_common(wq, condition, timeout, 0)
+#define wait_event_interruptible(wq, cond)								\
+		__wait_event(wq, cond, TASK_INTERRUPTIBLE, false)
 
-#define wait_event_interruptible_timeout(wq, condition, timeout)	\
-		__wait_event_common(wq, condition, timeout, B_CAN_INTERRUPT)
+#define wait_event_timeout(wq, cond, timeout)							\
+		__wait_event_timeout(wq, cond, 0, false, timeout)
+
+#define wait_event_interruptible_timeout(wq, cond, timeout)				\
+		__wait_event_timeout(wq, cond, TASK_INTERRUPTIBLE, 0, timeout)
 
 #endif	/* _LINUX_WAIT_H_ */

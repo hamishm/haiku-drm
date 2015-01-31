@@ -12,7 +12,8 @@ UseHeaders $(HAIKU_PRIVATE_KERNEL_HEADERS) : true ;
 Includes [ FGristFiles kernel_c++_structs.h ]
 	: <src!system!kernel>kernel_c++_struct_sizes.h ;
 
-SubDirCcFlags [ FDefines _KERNEL=1 B_USE_POSITIVE_POSIX_ERRORS=1 ] ;
+SubDirCcFlags [ FDefines _KERNEL=1 B_USE_POSITIVE_POSIX_ERRORS=1 ]
+	-Wno-unused ;
 
 KernelStaticLibrary linux_compat.a :
 	initfirst.c  # Must be first
@@ -21,9 +22,12 @@ KernelStaticLibrary linux_compat.a :
 	device.c
 	driver.c
 	idr.c
+	kernel.c
 	kobject.c
+	ww_mutex.c
 
-	condvar.cpp
+	completion.cpp
+	sched.cpp
 	wait.cpp
 	workqueue.cpp
 

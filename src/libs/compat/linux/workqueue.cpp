@@ -5,11 +5,19 @@
 
 extern "C" {
 #include <linux/workqueue.h>
+#include <linux/err.h>
 #include <linux/list.h>
 }
 
 #include <condition_variable.h>
+#include <lock.h>
+#include <thread.h>
 
+
+static work_struct* to_work(struct list_head* entry)
+{
+	return container_of(entry, struct work_struct, list);
+}
 
 struct workqueue_struct {
 	const char* name;
@@ -29,7 +37,7 @@ struct workqueue_struct {
 extern "C" {
 
 
-static void
+static status_t
 workqueue_thread(void* arg) {
 	struct workqueue_struct* wq = (struct workqueue_struct*)arg;
 
@@ -42,10 +50,10 @@ workqueue_thread(void* arg) {
 			}
 
 			ConditionVariableEntry entry;
-			wake.Add(&entry);
+			wq->wake.Add(&entry);
 
 			mutex_unlock(&wq->lock);
-			wake.Wait();
+			wq->wake.Wait();
 			mutex_lock(&wq->lock);
 			continue;
 		}
@@ -56,41 +64,43 @@ workqueue_thread(void* arg) {
 
 		struct work_struct *work, *tmp;
 		list_for_each_entry_safe(work, tmp, &wq->list, list) {
-			list_move_tail(&work->list, linked_work);
+			list_move_tail(&work->list, &linked_work);
 			if (!work->linked)
 				break;
 		}
 
 		mutex_unlock(&wq->lock);
 		list_for_each_entry(work, &linked_work, list) {
-			work->callback(work->data);
+			work->fn(work);
 		}
 		mutex_lock(&wq->lock);
 
 	}
+
+	return B_OK;
 }
 
 
 struct workqueue_struct*
 _workqueue_create(const char* name, int threads) {
-	struct workqueue_struct* wq = malloc(sizeof(struct workqueue_struct) +
-		sizeof(thread_id) * threads);
+	struct workqueue_struct* wq = (struct workqueue_struct*)
+		malloc(sizeof(struct workqueue_struct) + sizeof(thread_id) * threads);
 	if (wq == NULL)
 		return NULL;
 
 	wq->name = name;
-	wq->wake.Init(this, name);
+	wq->wake.Init((void*)wq, name);
 	wq->closed = false;
 	wq->threads = threads;
 
-	mutex_init(&wq->lock);
+	mutex_init(&wq->lock, "linux wq");
 	INIT_LIST_HEAD(&wq->list);
 
 	for (int i = 0; i < threads; i++) {
-		wq->thread[i] = spawn_kernel_thread(&_workqueue_thread, "lwq",
-			B_NORMAL_PRIORITY, this);
+		wq->thread[i] = spawn_kernel_thread(workqueue_thread, "lwq",
+			B_NORMAL_PRIORITY, (void*)wq);
 		if (wq->thread[i] < 0)
-			return wq->thread[i];
+			return (struct workqueue_struct*)ERR_PTR(wq->thread[i]);
 
 		resume_thread(wq->thread[i]);
 	}
@@ -121,14 +131,14 @@ queue_work(struct workqueue_struct* wq, struct work_struct* work)
 	// Work items are allowed to queue more work even when the queue
 	// is closing.
 	if (work->queue->closed && !on_workqueue_thread(wq)) {
-		mutex_unlock(&wq->unlock);
+		mutex_unlock(&wq->lock);
 		return false;
 	}
 
 	list_add_tail(&wq->list, &work->list);
 	mutex_unlock(&wq->lock);
 
-	wq->wake.Notify();
+	wq->wake.NotifyOne();
 	return true;
 }
 
@@ -137,7 +147,8 @@ static inline int32
 _delayed_work_timer(struct timer* event)
 {
 	struct delayed_work *work = container_of(event, struct delayed_work, event);
-	queue_work(wq, &work->work);
+	queue_work(work->work.queue, &work->work);
+	return B_OK;
 }
 
 
@@ -145,14 +156,14 @@ bool
 queue_delayed_work(struct workqueue_struct *wq, struct delayed_work *work,
     unsigned long delay)
 {
-	if (work->queue != NULL)
+	if (work->work.queue != NULL)
 		return false;
 
 	if (delay != 0) {
 		add_timer(&work->event, _delayed_work_timer, delay,
 			B_ONE_SHOT_RELATIVE_TIMER);
 	} else {
-		queue_work(wq, work);
+		queue_work(wq, &work->work);
 	}
 
 	return true;
@@ -164,9 +175,9 @@ destroy_workqueue(struct workqueue_struct* wq)
 {
 	mutex_lock(&wq->lock);
 	wq->closed = true;
-	mutex_unlock(&wq->unlock);
+	mutex_unlock(&wq->lock);
 
-	wake.NotifyAll();
+	wq->wake.NotifyAll();
 
 	for (int i = 0; i < wq->threads; i++) {
 		wait_for_thread(wq->thread[i], NULL);
@@ -177,7 +188,8 @@ destroy_workqueue(struct workqueue_struct* wq)
 struct flush_work {
 	struct work_struct work;
 	ConditionVariable sync;
-}
+};
+
 
 static void
 flush_sync(struct work_struct* work)
@@ -192,7 +204,7 @@ wait_work_locked(struct workqueue_struct* wq, struct work_struct* work)
 {
 	struct flush_work flush;
 	INIT_WORK(&flush.work, flush_sync);
-	flush.sync.Init(&cancel, "lwq cancel");
+	flush.sync.Init(&flush, "lwq cancel");
 
 	work->linked = true;
 	list_add(&work->list, &flush.work.list);
@@ -211,14 +223,14 @@ cancel_work_sync(struct work_struct* work)
 	if (work->queue == NULL)
 		return false;
 
-	mutex_lock(&wq->lock);
+	mutex_lock(&work->queue->lock);
 	if (!list_empty(&work->list)) {
 		list_del_init(&work->list);
-		mutex_unlock(&wq->lock);
+		mutex_unlock(&work->queue->lock);
 		return true;
 	}
 
-	wait_work_locked(work->queue, &work->list);
+	wait_work_locked(work->queue, work);
 	return false;
 }
 
@@ -227,7 +239,12 @@ void
 flush_workqueue(struct workqueue_struct* wq)
 {
 	mutex_lock(&wq->lock);
-	wait_work_locked(work->queue, wq->list->prev);
+	if (list_empty(&wq->list)) {
+		mutex_unlock(&wq->lock);
+		return;
+	}
+
+	wait_work_locked(wq, to_work(wq->list.prev));
 }
 
 
@@ -235,7 +252,7 @@ bool
 mod_delayed_work(struct workqueue_struct* wq, struct delayed_work* work,
 	unsigned long delay)
 {
-	bool fired = cancel_timer(work->event);
+	bool fired = cancel_timer(&work->event);
 	if (!fired) {
 		queue_delayed_work(wq, work, delay);
 		return true;
@@ -252,52 +269,53 @@ flush_work(struct work_struct* work)
 	if (work->queue == NULL)
 		return false;
 
-	mutex_lock(&wq->lock);
+	mutex_lock(&work->queue->lock);
 	if (list_empty(&work->list)) {
-		mutex_unlock(&wq->lock);
+		mutex_unlock(&work->queue->lock);
 		return false;
 	}
 
-	wait_work_locked(work->queue, &work->list);
+	wait_work_locked(work->queue, work);
+	return true;
 }
 
 
 bool 
-flush_delayed_work(struct delayed_struct* work)
+flush_delayed_work(struct delayed_work* work)
 {
-	if (!cancel_timer(work->event)) {
-		queue_work(work->queue, &work->work);
+	if (!cancel_timer(&work->event)) {
+		queue_work(work->work.queue, &work->work);
 	}
 
-	flush_work(&work->work);
+	return flush_work(&work->work);
 }
 
 bool
-cancel_delayed_work(struct delayed_struct* work)
+cancel_delayed_work(struct delayed_work* work)
 {
-	if (!cancel_timer(work->event))
+	if (!cancel_timer(&work->event))
 		return true;
 
-	if (work->queue == NULL)
+	if (work->work.queue == NULL)
 		return false;
 
 	bool result = false;
 
-	mutex_lock(&work->queue->lock);
-	if (!list_empty(&work->list)) {
-		list_del_init(&work->list);
+	mutex_lock(&work->work.queue->lock);
+	if (!list_empty(&work->work.list)) {
+		list_del_init(&work->work.list);
 		result = true;
 	}
 
-	mutex_unlock(&work->queue->lock);
+	mutex_unlock(&work->work.queue->lock);
 	return false;
 }
 
 
 bool
-cancel_delayed_work_sync(struct delayed_struct* work)
+cancel_delayed_work_sync(struct delayed_work* work)
 {
-	if (!cancel_timer(work->event))
+	if (!cancel_timer(&work->event))
 		return true;
 
 	return cancel_work_sync(&work->work);
