@@ -32,6 +32,7 @@
 #define	_ASM_ATOMIC_H_
 
 #include <SupportDefs.h>
+#include <arch/atomic.h>
 #include <sys/types.h>
 #include <linux/compiler.h>
 
@@ -131,11 +132,13 @@ atomic_set_mask(int mask, atomic_t *v)
 	atomic_or(&v->counter, mask);
 }
 
+#define	atomic_sub(i, v)		atomic_sub_return((i), (v))
+
+/*
 #undef atomic_add
-#undef atomic_sub
 #undef atomic_set
 #define	atomic_add(i, v)		atomic_add_return((i), (v))
-#define	atomic_sub(i, v)		atomic_sub_return((i), (v))
 #define atomic_set(v, i)		linux_atomic_set((v), (i))
+*/
 
 #endif	/* _ASM_ATOMIC_H_ */

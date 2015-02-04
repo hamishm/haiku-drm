@@ -48,17 +48,24 @@ static inline void* kmalloc(size_t size, uint32 flags)
 }
 
 
-#define	kvmalloc(size)				kmalloc((size), 0)
-#define	kzalloc(size, flags)		kmalloc((size), (flags) | __GFP_ZERO)
+#define PAGE_KERNEL 0x0001
+
+
+#define	kvmalloc(size)					kmalloc((size), 0)
+#define	kzalloc(size, flags)			kmalloc((size), (flags) | __GFP_ZERO)
 #define	kzalloc_node(size, flags, node)	kzalloc(size, flags)
-#define	kfree(ptr)					free((ptr))
-#define	krealloc(ptr, size, flags)	realloc((ptr), (size))
-#define	kcalloc(n, size, flags)	    kmalloc((n) * (size), (flags) | __GFP_ZERO)
-#define	vzalloc(size)				kzalloc((size), GFP_KERNEL)
-#define	vfree(arg)					kfree((arg))
-#define	kvfree(arg)					kfree((arg))
-#define	vmalloc(size)				kmalloc((size), GFP_KERNEL)
-#define	vmalloc_node(size, node)	kmalloc((size), GFP_KERNEL)
+#define	kfree(ptr)						free((ptr))
+#define	krealloc(ptr, size, flags)		realloc((ptr), (size))
+#define	kcalloc(n, size, flags)	    	kmalloc((n) * (size), (flags) | __GFP_ZERO)
+#define	vzalloc(size)					kzalloc((size), GFP_KERNEL)
+#define	vfree(arg)						kfree((arg))
+#define	kvfree(arg)						kfree((arg))
+#define	vmalloc(size)					kmalloc((size), GFP_KERNEL)
+#define	vmalloc_node(size, node)		kmalloc((size), GFP_KERNEL)
+
+// XXX
+#define __vmalloc(size, flags, prot)	kmalloc((size), (flags))
+#define is_vmalloc_addr(ptr) 			(true)
 
 
 struct kmem_cache {

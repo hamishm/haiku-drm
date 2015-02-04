@@ -29,14 +29,16 @@
 
 #include <asm/io.h>
 
-#if defined(writel)
-#undef writel
-#endif
-
 static inline void
-writel(uint32_t value, void *addr)
+writel(uint32_t value, void* addr)
 {
-	*(volatile uint32_t *)addr = value;
+	*(volatile uint32_t*)addr = value;
+}
+
+static inline uint32_t
+readl(void* addr)
+{
+	return *(volatile uint32_t*)addr;
 }
 
 #endif	/* _LINUX_IO_H_ */

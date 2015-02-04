@@ -53,5 +53,6 @@ linux_mutex_init(mutex_t *m)
 }
 
 #define	mutex_init	linux_mutex_init
+#define mutex 		linux_mutex
 
 #endif	/* _LINUX_MUTEX_H_ */

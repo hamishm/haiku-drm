@@ -32,10 +32,26 @@
 #ifndef	_LINUX_HDMI_H_
 #define	_LINUX_HDMI_H_
 
-#include <sys/types.h>
-#include <sys/param.h>
-#include <sys/errno.h>
-#include <sys/systm.h>
+#include <ByteOrder.h>
+
+#include <linux/errno.h>
+#include <linux/types.h>
+
+#define __BIT(__n) (((__n) == 32) ? 0 : ((uint32)1 << (__n)))
+
+#define __BITS(__m, __n)		\
+	((__BIT(max_c((__m), (__n)) + 1) - 1) ^ (__BIT(min_c((__m), (__n))) - 1))
+
+#define __LOWEST_SET_BIT(__mask) ((((__mask) - 1) & (__mask)) ^ (__mask))
+#define __SHIFTOUT(__x, __mask) (((__x) & (__mask)) / __LOWEST_SET_BIT(__mask))
+#define __SHIFTIN(__x, __mask) ((__x) * __LOWEST_SET_BIT(__mask))
+#define __SHIFTOUT_MASK(__mask) __SHIFTOUT((__mask), (__mask))
+
+#define le16enc(__addr, __arg)								\
+	do {													\
+		*((int16*)__addr) = B_HOST_TO_LENDIAN_INT16(__arg);	\
+	} while (0)
+
 
 enum hdmi_3d_structure {
         HDMI_3D_STRUCTURE_INVALID		= -1,
@@ -183,9 +199,8 @@ struct hdmi_infoframe_header {
 
 static inline void
 hdmi_infoframe_header_init(struct hdmi_infoframe_header *header,
-    enum hdmi_infoframe_type type, uint8_t vers, uint8_t length)
+	enum hdmi_infoframe_type type, uint8_t vers, uint8_t length)
 {
-
 	header->type = type;
 	header->version = vers;
 	header->length = length;
@@ -259,12 +274,12 @@ hdmi_audio_infoframe_pack(const struct hdmi_audio_infoframe *frame, void *buf,
 	uint8_t *p = buf;
 	int ret;
 
-	KASSERT(frame->header.length == HDMI_AUDIO_INFOFRAME_SIZE);
+	ASSERT(frame->header.length == HDMI_AUDIO_INFOFRAME_SIZE);
 
 	ret = hdmi_infoframe_header_pack(&frame->header, length, p, size);
 	if (ret < 0)
 		return ret;
-	KASSERT(ret == HDMI_INFOFRAME_HEADER_SIZE);
+	ASSERT(ret == HDMI_INFOFRAME_HEADER_SIZE);
 	p += HDMI_INFOFRAME_HEADER_SIZE;
 	size -= HDMI_INFOFRAME_HEADER_SIZE;
 
@@ -284,7 +299,7 @@ hdmi_audio_infoframe_pack(const struct hdmi_audio_infoframe *frame, void *buf,
 	p[4] = __SHIFTIN(frame->downmix_inhibit? 1 : 0, __BIT(7));
 
 	/* XXX p[5], p[6], p[7], p[8], p[9]?  */
-	CTASSERT(HDMI_AUDIO_INFOFRAME_SIZE == 10);
+	STATIC_ASSERT(HDMI_AUDIO_INFOFRAME_SIZE == 10);
 
 	hdmi_infoframe_checksum(buf, length);
 
@@ -335,12 +350,12 @@ hdmi_avi_infoframe_pack(const struct hdmi_avi_infoframe *frame, void *buf,
 	uint8_t *p = buf;
 	int ret;
 
-	KASSERT(frame->header.length == HDMI_AVI_INFOFRAME_SIZE);
+	ASSERT(frame->header.length == HDMI_AVI_INFOFRAME_SIZE);
 
 	ret = hdmi_infoframe_header_pack(&frame->header, length, p, size);
 	if (ret < 0)
 		return ret;
-	KASSERT(ret == HDMI_INFOFRAME_HEADER_SIZE);
+	ASSERT(ret == HDMI_INFOFRAME_HEADER_SIZE);
 	p += HDMI_INFOFRAME_HEADER_SIZE;
 	size -= HDMI_INFOFRAME_HEADER_SIZE;
 
@@ -369,7 +384,7 @@ hdmi_avi_infoframe_pack(const struct hdmi_avi_infoframe *frame, void *buf,
 	le16enc(&p[7], frame->bottom_bar);
 	le16enc(&p[9], frame->left_bar);
 	le16enc(&p[11], frame->right_bar);
-	CTASSERT(HDMI_AVI_INFOFRAME_SIZE == 13);
+	STATIC_ASSERT(HDMI_AVI_INFOFRAME_SIZE == 13);
 
 	hdmi_infoframe_checksum(buf, length);
 
@@ -425,12 +440,12 @@ hdmi_spd_infoframe_pack(struct hdmi_spd_infoframe *frame, void *buf,
 	uint8_t *p = buf;
 	int ret;
 
-	KASSERT(frame->header.length == HDMI_SPD_INFOFRAME_SIZE);
+	ASSERT(frame->header.length == HDMI_SPD_INFOFRAME_SIZE);
 
 	ret = hdmi_infoframe_header_pack(&frame->header, length, p, size);
 	if (ret < 0)
 		return ret;
-	KASSERT(ret == HDMI_INFOFRAME_HEADER_SIZE);
+	ASSERT(ret == HDMI_INFOFRAME_HEADER_SIZE);
 	p += HDMI_INFOFRAME_HEADER_SIZE;
 	size -= HDMI_INFOFRAME_HEADER_SIZE;
 
@@ -497,7 +512,7 @@ hdmi_vendor_infoframe_pack(const struct hdmi_vendor_infoframe *frame,
 	ret = hdmi_infoframe_header_pack(&frame->header, length, p, size);
 	if (ret < 0)
 		return ret;
-	KASSERT(ret == HDMI_INFOFRAME_HEADER_SIZE);
+	ASSERT(ret == HDMI_INFOFRAME_HEADER_SIZE);
 	p += HDMI_INFOFRAME_HEADER_SIZE;
 	size -= HDMI_INFOFRAME_HEADER_SIZE;
 
