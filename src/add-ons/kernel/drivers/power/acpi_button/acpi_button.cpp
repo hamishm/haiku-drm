@@ -11,6 +11,7 @@
 #include <ACPI.h>
 
 #include <fs/select_sync_pool.h>
+#include <lock.h>
 
 #include <stdlib.h>
 #include <string.h>
@@ -42,7 +43,8 @@ typedef struct acpi_ns_device_info {
 	uint32 type;
 	bool fixed;
 	uint8 last_status;
-	select_sync_pool* select_pool;
+	select_sync_pool select_pool;
+	mutex pool_lock;
 } acpi_button_device_info;
 
 
@@ -53,8 +55,7 @@ acpi_button_notify_handler(acpi_handle _device, uint32 value, void *context)
 	if (value == ACPI_NOTIFY_BUTTON_SLEEP) {
 		TRACE("sleep\n");
 		device->last_status = 1;
-		if (device->select_pool != NULL)
-			notify_select_event_pool(device->select_pool, B_SELECT_READ);
+		select_sync_notify_pool(&device->select_pool, B_EVENT_READ);
 	} else if (value == ACPI_NOTIFY_BUTTON_WAKEUP) {
 		TRACE("wakeup\n");
 	} else {
@@ -70,8 +71,7 @@ acpi_button_fixed_handler(void *context)
 	acpi_button_device_info *device = (acpi_button_device_info *)context;
 	TRACE("sleep\n");
 	device->last_status = 1;
-	if (device->select_pool != NULL)
-		notify_select_event_pool(device->select_pool, B_SELECT_READ);
+	select_sync_notify_pool(&device->select_pool, B_EVENT_READ);
 	return B_OK;
 }
 
@@ -114,7 +114,9 @@ acpi_button_init_device(void *_cookie, void **cookie)
 	else
 		return B_ERROR;
 	device->last_status = 0;
-	device->select_pool = NULL;
+
+	mutex_init(&device->pool_lock, "acpi button select pool lock");
+	select_sync_init_pool(&device->select_pool, &device->pool_lock);
 
 	if (device->fixed) {
 		sAcpi->reset_fixed_event(device->type);
@@ -198,23 +200,19 @@ acpi_button_control(void* _cookie, uint32 op, void* arg, size_t len)
 
 
 static status_t
-acpi_button_select(void *_cookie, uint8 event, selectsync *sync)
+acpi_button_select(void* _cookie, int32 events, selectsync* sync)
 {
 	acpi_button_device_info* device = (acpi_button_device_info*)_cookie;
 
-	if (event != B_SELECT_READ)
+	if ((events & B_EVENT_READ) == 0)
 		return B_BAD_VALUE;
 
-	// add the event to the pool
-	status_t error = add_select_sync_pool_entry(&device->select_pool, sync,
-		event);
-	if (error != B_OK) {
-		ERROR("add_select_sync_pool_entry() failed: %#lx\n", error);
-		return error;
-	}
+	mutex_lock(&device->pool_lock);
+	select_sync_add_pool_entry(&device->select_pool, sync);
+	mutex_unlock(&device->pool_lock);
 
 	if (device->last_status != 0)
-		notify_select_event(sync, event);
+		return B_EVENT_READ;
 
 	return B_OK;
 }
@@ -223,12 +221,7 @@ acpi_button_select(void *_cookie, uint8 event, selectsync *sync)
 static status_t
 acpi_button_deselect(void *_cookie, uint8 event, selectsync *sync)
 {
-	acpi_button_device_info* device = (acpi_button_device_info*)_cookie;
-
-	if (event != B_SELECT_READ)
-		return B_BAD_VALUE;
-
-	return remove_select_sync_pool_entry(&device->select_pool, sync, event);
+	return B_UNSUPPORTED;
 }
 
 

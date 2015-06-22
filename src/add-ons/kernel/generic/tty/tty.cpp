@@ -838,8 +838,7 @@ tty_notify_select_event(struct tty* tty, uint8 event)
 {
 	TRACE(("tty_notify_select_event(%p, %u)\n", tty, event));
 
-	if (tty->select_pool)
-		notify_select_event_pool(tty->select_pool, event);
+	notify_select_event_pool(&tty->select_pool, event);
 }
 
 
@@ -1325,10 +1324,10 @@ tty_create(tty_service_func func, bool isMaster)
 		return NULL;
 
 	mutex_init(&tty->lock, "tty lock");
+	select_sync_init_pool(&tty->select_pool, &tty->lock);
 
 	tty->ref_count = 0;
 	tty->open_count = 0;
-	tty->select_pool = NULL;
 	tty->is_master = isMaster;
 	tty->pending_eof = 0;
 	tty->hardware_bits = 0;
@@ -1836,13 +1835,7 @@ tty_select(tty_cookie* cookie, uint8 event, uint32 ref, selectsync* sync)
 		otherTTY = NULL;
 
 	// add the event to the TTY's pool
-	status_t error = add_select_sync_pool_entry(&tty->select_pool, sync, event);
-	if (error != B_OK) {
-		TRACE(("tty_select() done: add_select_sync_pool_entry() failed: %lx\n",
-			error));
-
-		return error;
-	}
+	add_select_sync_pool_entry(&tty->select_pool, sync, event);
 
 	// finally also acquire the request mutex, for access to the reader/writer
 	// queues
@@ -1891,19 +1884,7 @@ tty_select(tty_cookie* cookie, uint8 event, uint32 ref, selectsync* sync)
 status_t
 tty_deselect(tty_cookie* cookie, uint8 event, selectsync* sync)
 {
-	struct tty* tty = cookie->tty;
-
-	TRACE(("tty_deselect(cookie = %p, event = %u, sync = %p)\n", cookie, event,
-		sync));
-
-	// we don't support all kinds of events
-	if (event < B_SELECT_READ || event > B_SELECT_ERROR)
-		return B_BAD_VALUE;
-
-	// lock the TTY (guards the select sync pool, among other things)
-	MutexLocker ttyLocker(tty->lock);
-
-	return remove_select_sync_pool_entry(&tty->select_pool, sync, event);
+	return B_UNSUPPORTED;
 }
 
 

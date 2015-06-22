@@ -52,6 +52,7 @@
 #include <vfs.h>
 #include <vm/vm.h>
 #include <vm/VMCache.h>
+#include <wait_for_objects.h>
 
 #include "EntryCache.h"
 #include "fifo.h"
@@ -337,7 +338,7 @@ static off_t file_seek(struct file_descriptor* descriptor, off_t pos,
 	int seekType);
 static void file_free_fd(struct file_descriptor* descriptor);
 static status_t file_close(struct file_descriptor* descriptor);
-static status_t file_select(struct file_descriptor* descriptor, uint8 event,
+static int32 file_select(struct file_descriptor* descriptor, int32 events,
 	struct selectsync* sync);
 static status_t file_deselect(struct file_descriptor* descriptor, uint8 event,
 	struct selectsync* sync);
@@ -5647,8 +5648,8 @@ file_seek(struct file_descriptor* descriptor, off_t pos, int seekType)
 }
 
 
-static status_t
-file_select(struct file_descriptor* descriptor, uint8 event,
+static int32
+file_select(struct file_descriptor* descriptor, int32 events,
 	struct selectsync* sync)
 {
 	FUNCTION(("file_select(%p, %u, %p)\n", descriptor, event, sync));
@@ -5657,9 +5658,9 @@ file_select(struct file_descriptor* descriptor, uint8 event,
 
 	// If the FS has no select() hook, notify select() now.
 	if (!HAS_FS_CALL(vnode, select))
-		return notify_select_event(sync, event);
+		return notify_select_events((select_info*)sync, events);
 
-	return FS_CALL(vnode, select, descriptor->cookie, event, sync);
+	return FS_CALL(vnode, select, descriptor->cookie, events, sync);
 }
 
 

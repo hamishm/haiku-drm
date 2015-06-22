@@ -261,11 +261,11 @@ socket_set_flags(struct file_descriptor *descriptor, int flags)
 }
 
 
-static status_t
-socket_select(struct file_descriptor *descriptor, uint8 event,
+static int32
+socket_select(struct file_descriptor *descriptor, int32 events,
 	struct selectsync *sync)
 {
-	return sStackInterface->select(descriptor->u.socket, event, sync);
+	return sStackInterface->select(descriptor->u.socket, events, sync);
 }
 
 

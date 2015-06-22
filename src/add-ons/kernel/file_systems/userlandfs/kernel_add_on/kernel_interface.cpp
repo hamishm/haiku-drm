@@ -316,16 +316,16 @@ userlandfs_set_flags(fs_volume* fsVolume, fs_vnode* fsNode, void* cookie,
 }
 
 // userlandfs_select
-static status_t
+static int32
 userlandfs_select(fs_volume* fsVolume, fs_vnode* fsNode, void* cookie,
-	uint8 event, selectsync* sync)
+	int32 events, selectsync* sync)
 {
 	Volume* volume = (Volume*)fsVolume->private_volume;
 	PRINT(("userlandfs_select(%p, %p, %p, %hhd, %p)\n", volume,
 		fsNode->private_node, cookie, event, sync));
-	status_t error = volume->Select(fsNode->private_node, cookie, event, sync);
-	PRINT(("userlandfs_select() done: (%" B_PRIx32 ")\n", error));
-	return error;
+	int32 revents = volume->Select(fsNode->private_node, cookie, events, sync);
+	PRINT(("userlandfs_select() done: (%" B_PRIx32 ")\n", revents));
+	return revents;
 }
 
 // userlandfs_deselect

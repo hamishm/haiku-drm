@@ -7,8 +7,15 @@
 
 #include <SupportDefs.h>
 
-struct selectsync;
-typedef struct select_sync_pool select_sync_pool;
+
+typedef struct selectsync selectsync;
+typedef struct mutex mutex;
+
+
+typedef struct select_sync_pool {
+	selectsync*	first;
+	mutex*		lock;
+} select_sync_pool;
 
 
 #ifdef __cplusplus
@@ -16,12 +23,23 @@ extern "C" {
 #endif
 
 
-status_t add_select_sync_pool_entry(select_sync_pool **pool, selectsync *sync,
-			uint8 event);
-status_t remove_select_sync_pool_entry(select_sync_pool **pool,
-			selectsync *sync, uint8 event);
-void delete_select_sync_pool(select_sync_pool *pool);
-void notify_select_event_pool(select_sync_pool *pool, uint8 event);
+// New style select_sync_pool API
+
+static void
+select_sync_init_pool(select_sync_pool* pool, mutex* lock)
+{
+	pool->first = NULL;
+	pool->lock = lock;
+}
+
+void select_sync_notify_pool(select_sync_pool* pool, int32 events);
+void select_sync_add_pool_entry(select_sync_pool* pool, selectsync* sync);
+
+
+// Old select_sync_pool API
+
+void notify_select_event_pool(select_sync_pool* pool, uint8 event);
+void add_select_sync_pool_entry(select_sync_pool* pool, selectsync* sync, uint8 event);
 
 
 #ifdef __cplusplus

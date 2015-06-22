@@ -1246,10 +1246,10 @@ overlay_set_flags(fs_volume *volume, fs_vnode *vnode, void *cookie,
 
 
 static status_t
-overlay_select(fs_volume *volume, fs_vnode *vnode, void *cookie, uint8 event,
+overlay_select(fs_volume *volume, fs_vnode *vnode, void *cookie, int32 events,
 	selectsync *sync)
 {
-	OVERLAY_CALL(select, cookie, event, sync)
+	OVERLAY_CALL(select, cookie, events, sync)
 }
 
 

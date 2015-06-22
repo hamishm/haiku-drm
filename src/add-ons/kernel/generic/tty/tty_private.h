@@ -130,7 +130,7 @@ struct tty {
 	int32				open_count;
 	struct mutex		lock;
 	tty_settings		settings;
-	select_sync_pool*	select_pool;
+	select_sync_pool	select_pool;
 	RequestQueue		reader_queue;
 	RequestQueue		writer_queue;
 	TTYCookieList		cookies;

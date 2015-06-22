@@ -2161,26 +2161,22 @@ thread_exit(void)
 	clear_thread_debug_info(&thread->debug_info, true);
 	threadDebugInfoLocker.Unlock();
 
-	// Remove the select infos. We notify them a little later.
-	select_info* selectInfos = thread->select_infos;
+	// notify select infos
+	select_info* info = thread->select_infos;
+	while (info != NULL) {
+		notify_select_events(info, B_EVENT_INVALID);
+		info = info->object_next;
+	}
+
 	thread->select_infos = NULL;
 
 	threadCreationLocker.Unlock();
+
 	restore_interrupts(state);
 
 	threadLocker.Unlock();
 
 	destroy_thread_debug_info(&debugInfo);
-
-	// notify select infos
-	select_info* info = selectInfos;
-	while (info != NULL) {
-		select_sync_base* sync = info->sync;
-
-		notify_select_events(info, B_EVENT_INVALID);
-		info = info->next;
-		put_select_sync(sync);
-	}
 
 	// notify listeners
 	sNotificationService.Notify(THREAD_REMOVED, thread);
@@ -2545,11 +2541,8 @@ select_thread(int32 id, struct select_info* info, bool kernel)
 
 	// add info to list
 	if (info->selected_events != 0) {
-		info->next = thread->select_infos;
+		info->object_next = thread->select_infos;
 		thread->select_infos = info;
-
-		// we need a sync reference
-		atomic_add(&info->sync->ref_count, 1);
 	}
 
 	return B_OK;
@@ -2569,17 +2562,14 @@ deselect_thread(int32 id, struct select_info* info, bool kernel)
 	// remove info from list
 	select_info** infoLocation = &thread->select_infos;
 	while (*infoLocation != NULL && *infoLocation != info)
-		infoLocation = &(*infoLocation)->next;
+		infoLocation = &(*infoLocation)->object_next;
 
 	if (*infoLocation != info)
 		return B_OK;
 
-	*infoLocation = info->next;
+	*infoLocation = info->object_next;
 
 	threadLocker.Unlock();
-
-	// surrender sync reference
-	put_select_sync(info->sync);
 
 	return B_OK;
 }

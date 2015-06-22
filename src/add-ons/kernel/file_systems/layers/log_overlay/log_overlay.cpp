@@ -223,12 +223,12 @@ overlay_set_flags(fs_volume *volume, fs_vnode *vnode, void *cookie,
 
 
 static status_t
-overlay_select(fs_volume *volume, fs_vnode *vnode, void *cookie, uint8 event,
+overlay_select(fs_volume *volume, fs_vnode *vnode, void *cookie, int32 events,
 	selectsync *sync)
 {
 	DO_LOG("select cookie: %p; event: %u; selectsync: %p\n", cookie, event,
 		sync);
-	OVERLAY_CALL(select, cookie, event, sync)
+	OVERLAY_CALL(select, cookie, events, sync)
 	DO_LOG("select result: 0x%08lx\n", result);
 	return result;
 }

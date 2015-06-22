@@ -575,7 +575,7 @@ select_sem(int32 id, struct select_info* info, bool kernel)
 		info->selected_events &= B_EVENT_ACQUIRE_SEMAPHORE | B_EVENT_INVALID;
 
 		if (info->selected_events != 0) {
-			info->next = sSems[slot].u.used.select_infos;
+			info->object_next = sSems[slot].u.used.select_infos;
 			sSems[slot].u.used.select_infos = info;
 
 			if (sSems[slot].u.used.count > 0)
@@ -610,10 +610,10 @@ deselect_sem(int32 id, struct select_info* info, bool kernel)
 	if (sSems[slot].id == id) {
 		select_info** infoLocation = &sSems[slot].u.used.select_infos;
 		while (*infoLocation != NULL && *infoLocation != info)
-			infoLocation = &(*infoLocation)->next;
+			infoLocation = &(*infoLocation)->object_next;
 
 		if (*infoLocation == info)
-			*infoLocation = info->next;
+			*infoLocation = info->object_next;
 	}
 
 	RELEASE_SEM_LOCK(sSems[slot]);

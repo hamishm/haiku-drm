@@ -385,7 +385,7 @@ bindfs_set_flags(fs_volume* fsVolume, fs_vnode* fsNode, void* cookie, int flags)
 
 
 static status_t
-bindfs_select(fs_volume* fsVolume, fs_vnode* fsNode, void* cookie, uint8 event,
+bindfs_select(fs_volume* fsVolume, fs_vnode* fsNode, void* cookie, int32 events,
 	selectsync* sync)
 {
 	Volume* volume = (Volume*)fsVolume->private_volume;
@@ -396,7 +396,7 @@ bindfs_select(fs_volume* fsVolume, fs_vnode* fsNode, void* cookie, uint8 event,
 
 	FETCH_SOURCE_VOLUME_AND_NODE(volume, node->ID());
 
-	return sourceNode->ops->select(sourceVolume, sourceNode, cookie, event,
+	return sourceNode->ops->select(sourceVolume, sourceNode, cookie, events,
 		sync);
 }
 

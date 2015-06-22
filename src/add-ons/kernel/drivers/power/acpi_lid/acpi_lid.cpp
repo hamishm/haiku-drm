@@ -44,7 +44,8 @@ typedef struct acpi_ns_device_info {
 	acpi_device acpi_cookie;
 	uint8 last_status;
 	bool updated;
-	select_sync_pool* select_pool;
+	select_sync_pool select_pool;
+	mutex pool_lock;
 } acpi_lid_device_info;
 
 
@@ -76,8 +77,7 @@ acpi_lid_notify_handler(acpi_handle _device, uint32 value, void *context)
 	if (value == ACPI_NOTIFY_STATUS_CHANGED) {
 		TRACE("status changed\n");
 		acpi_lid_read_status(device);
-		if (device->select_pool != NULL)
-			notify_select_event_pool(device->select_pool, B_SELECT_READ);
+		select_sync_notify_pool(&device->select_pool, B_EVENT_READ);
 	} else {
 		ERROR("unknown notification\n");
 	}
@@ -141,23 +141,20 @@ acpi_lid_control(void* _cookie, uint32 op, void* arg, size_t len)
 
 
 static status_t
-acpi_lid_select(void *_cookie, uint8 event, selectsync *sync)
+acpi_lid_select(void *_cookie, int32 event, selectsync *sync)
 {
 	acpi_lid_device_info* device = (acpi_lid_device_info*)_cookie;
 
-	if (event != B_SELECT_READ)
+	if ((event & B_EVENT_READ) == 0)
 		return B_BAD_VALUE;
 
 	// add the event to the pool
-	status_t error = add_select_sync_pool_entry(&device->select_pool, sync,
-		event);
-	if (error != B_OK) {
-		ERROR("add_select_sync_pool_entry() failed: %#lx\n", error);
-		return error;
-	}
+	mutex_lock(&device->pool_lock);
+	select_sync_add_pool_entry(&device->select_pool, sync);
+	mutex_unlock(&device->pool_lock);
 
 	if (device->updated)
-		notify_select_event(sync, event);
+		return B_EVENT_READ;
 
 	return B_OK;
 }
@@ -166,12 +163,14 @@ acpi_lid_select(void *_cookie, uint8 event, selectsync *sync)
 static status_t
 acpi_lid_deselect(void *_cookie, uint8 event, selectsync *sync)
 {
+	return B_UNSUPPORTED;
+
 	acpi_lid_device_info* device = (acpi_lid_device_info*)_cookie;
 
 	if (event != B_SELECT_READ)
 		return B_BAD_VALUE;
 
-	return remove_select_sync_pool_entry(&device->select_pool, sync, event);
+	//return remove_select_sync_pool_entry(&device->select_pool, sync, event);
 }
 
 
@@ -264,7 +263,9 @@ acpi_lid_init_driver(device_node *node, void **_driverCookie)
 
 	device->last_status = 0;
 	device->updated = false;
-	device->select_pool = NULL;
+
+	mutex_init(&device->pool_lock, "acpi lid select pool lock");
+	select_sync_init_pool(&device->select_pool, &device->pool_lock);
 
 	*_driverCookie = device;
 	return B_OK;

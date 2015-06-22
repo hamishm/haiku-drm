@@ -38,7 +38,7 @@ public:
 	virtual	status_t		IO(void* cookie, io_request* request);
 	virtual	status_t		Control(void* cookie, int32 op, void* buffer,
 								size_t length);
-	virtual	status_t		Select(void* cookie, uint8 event, selectsync* sync);
+	virtual	status_t		Select(void* cookie, int32 events, selectsync* sync);
 	virtual	status_t		Deselect(void* cookie, uint8 event,
 								selectsync* sync);
 

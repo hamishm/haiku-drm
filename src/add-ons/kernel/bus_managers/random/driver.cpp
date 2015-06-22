@@ -115,19 +115,12 @@ random_free(void *cookie)
 }
 
 
-static status_t
-random_select(void *cookie, uint8 event, selectsync *sync)
+static int32
+random_select(void *cookie, int32 events, selectsync *sync)
 {
 	TRACE("select()\n");
 
-	if (event == B_SELECT_READ) {
-		/* tell there is already data to read */
-		notify_select_event(sync, event);
-	} else if (event == B_SELECT_WRITE) {
-		/* we're now writable */
-		notify_select_event(sync, event);
-	}
-	return B_OK;
+	return events & (B_EVENT_READ | B_EVENT_WRITE);
 }
 
 

@@ -367,7 +367,7 @@ FileDevice::Control(void* _cookie, int32 op, void* buffer, size_t length)
 
 
 status_t
-FileDevice::Select(void* _cookie, uint8 event, selectsync* sync)
+FileDevice::Select(void* _cookie, int32 events, selectsync* sync)
 {
 	// TODO: Support (select_fd())!
 	return B_UNSUPPORTED;

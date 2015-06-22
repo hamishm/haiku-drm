@@ -28,6 +28,7 @@
 #include <util/OpenHashTable.h>
 #include <util/Stack.h>
 #include <vfs.h>
+#include <wait_for_objects.h>
 
 #include "AbstractModuleDevice.h"
 #include "devfs_private.h"
@@ -69,7 +70,7 @@ public:
 
 	virtual	status_t		Open(const char* path, int openMode,
 								void** _cookie);
-	virtual	status_t		Select(void* cookie, uint8 event, selectsync* sync);
+	virtual	int32			Select(void* cookie, int32 events, selectsync* sync);
 
 			bool			Republished() const { return fRepublished; }
 			void			SetRepublished(bool republished)
@@ -1346,7 +1347,7 @@ LegacyDevice::SetHooks(device_hooks* hooks)
 			// version below is going to be called though, that redirects to
 			// the proper select hook, so it is ok to set it to an invalid
 			// address here.
-			fDeviceModule->select = (status_t (*)(void*, uint8, selectsync*))~0;
+			fDeviceModule->select = (status_t (*)(void*, int32, selectsync*))~0;
 		}
 
 		fDeviceModule->deselect = hooks->deselect;
@@ -1361,10 +1362,10 @@ LegacyDevice::Open(const char* path, int openMode, void** _cookie)
 }
 
 
-status_t
-LegacyDevice::Select(void* cookie, uint8 event, selectsync* sync)
+int32
+LegacyDevice::Select(void* cookie, int32 events, selectsync* sync)
 {
-	return Hooks()->select(cookie, event, 0, sync);
+	return select_sync_legacy_select(cookie, Hooks()->select, events, sync);
 }
 
 

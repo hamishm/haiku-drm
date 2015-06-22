@@ -222,9 +222,9 @@ stack_interface_ioctl(net_socket* socket, uint32 op, void* buffer,
 
 
 static status_t
-stack_interface_select(net_socket* socket, uint8 event, struct selectsync* sync)
+stack_interface_select(net_socket* socket, int32 events, struct selectsync* sync)
 {
-	return gNetSocketModule.request_notification(socket, event, sync);
+	return gNetSocketModule.request_notification(socket, events, sync);
 }
 
 

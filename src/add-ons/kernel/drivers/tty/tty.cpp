@@ -827,9 +827,10 @@ reset_tty(struct tty* tty, int32 index, mutex* lock, bool isMaster)
 	tty->index = index;
 	tty->lock = lock;
 	tty->settings = &gTTYSettings[index];
-	tty->select_pool = NULL;
 	tty->is_master = isMaster;
 	tty->pending_eof = 0;
+
+	select_sync_init_pool(&tty->select_pool, lock);
 }
 
 
@@ -1124,8 +1125,7 @@ tty_notify_select_event(struct tty* tty, uint8 event)
 {
 	TRACE(("tty_notify_select_event(%p, %u)\n", tty, event));
 
-	if (tty->select_pool)
-		notify_select_event_pool(tty->select_pool, event);
+	notify_select_event_pool(&tty->select_pool, event);
 }
 
 
@@ -1507,7 +1507,6 @@ dump_tty_struct(struct tty& tty)
 	kprintf("  index:        %" B_PRId32 "\n", tty.index);
 	kprintf("  is_master:    %s\n", tty.is_master ? "true" : "false");
 	kprintf("  open_count:   %" B_PRId32 "\n", tty.open_count);
-	kprintf("  select_pool:  %p\n", tty.select_pool);
 	kprintf("  pending_eof:  %" B_PRIu32 "\n", tty.pending_eof);
 	kprintf("  lock:         %p\n", tty.lock);
 
@@ -2015,13 +2014,7 @@ tty_select(tty_cookie* cookie, uint8 event, uint32 ref, selectsync* sync)
 		otherTTY = NULL;
 
 	// add the event to the TTY's pool
-	status_t error = add_select_sync_pool_entry(&tty->select_pool, sync, event);
-	if (error != B_OK) {
-		TRACE(("tty_select() done: add_select_sync_pool_entry() failed: %lx\n",
-			error));
-
-		return error;
-	}
+	add_select_sync_pool_entry(&tty->select_pool, sync, event);
 
 	// finally also acquire the request mutex, for access to the reader/writer
 	// queues
@@ -2070,19 +2063,7 @@ tty_select(tty_cookie* cookie, uint8 event, uint32 ref, selectsync* sync)
 status_t
 tty_deselect(tty_cookie* cookie, uint8 event, selectsync* sync)
 {
-	struct tty* tty = cookie->tty;
-
-	TRACE(("tty_deselect(cookie = %p, event = %u, sync = %p)\n", cookie, event,
-		sync));
-
-	// we don't support all kinds of events
-	if (event < B_SELECT_READ || event > B_SELECT_ERROR)
-		return B_BAD_VALUE;
-
-	// lock the TTY (guards the select sync pool, among other things)
-	MutexLocker ttyLocker(tty->lock);
-
-	return remove_select_sync_pool_entry(&tty->select_pool, sync, event);
+	return B_UNSUPPORTED;
 }
 
 

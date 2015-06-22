@@ -1162,7 +1162,7 @@ select_port(int32 id, struct select_info* info, bool kernel)
 	if (info->selected_events != 0) {
 		uint16 events = 0;
 
-		info->next = portRef->select_infos;
+		info->object_next = portRef->select_infos;
 		portRef->select_infos = info;
 
 		// check for events
@@ -1199,10 +1199,10 @@ deselect_port(int32 id, struct select_info* info, bool kernel)
 	// find and remove the infos
 	select_info** infoLocation = &portRef->select_infos;
 	while (*infoLocation != NULL && *infoLocation != info)
-		infoLocation = &(*infoLocation)->next;
+		infoLocation = &(*infoLocation)->object_next;
 
 	if (*infoLocation == info)
-		*infoLocation = info->next;
+		*infoLocation = info->object_next;
 
 	return B_OK;
 }

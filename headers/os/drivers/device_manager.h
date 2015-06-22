@@ -179,7 +179,7 @@ struct device_module_info {
 					size_t *_length);
 	status_t (*io)(void *cookie, io_request *request);
 	status_t (*control)(void *cookie, uint32 op, void *buffer, size_t length);
-	status_t (*select)(void *cookie, uint8 event, selectsync *sync);
+	int32 (*select)(void *cookie, int32 events, selectsync *sync);
 	status_t (*deselect)(void *cookie, uint8 event, selectsync *sync);
 };
 
