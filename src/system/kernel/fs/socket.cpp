@@ -32,6 +32,9 @@
 #define MAX_SOCKET_OPTION_LENGTH	128
 #define MAX_ANCILLARY_DATA_LENGTH	1024
 
+#define SOCKET_TYPE(type)			((type) & ~(SOCK_CLOEXEC | SOCK_NONBLOCK))
+#define SOCKET_FLAGS(type)			((type) & (SOCK_CLOEXEC | SOCK_NONBLOCK))
+
 #define GET_SOCKET_FD_OR_RETURN(fd, kernel, descriptor)	\
 	do {												\
 		status_t getError = get_socket_descriptor(fd, kernel, descriptor); \
@@ -337,14 +340,24 @@ static struct fd_ops sSocketFDOps = {
 
 
 static int
-create_socket_fd(net_socket* socket, bool kernel)
+create_socket_fd(net_socket* socket, int flags, bool kernel)
 {
-	// Get the socket's non-blocking flag, so we can set the respective
-	// open mode flag.
+	status_t error;
+
 	int32 nonBlock;
-	socklen_t nonBlockLen = sizeof(int32);
-	status_t error = sStackInterface->getsockopt(socket, SOL_SOCKET,
-		SO_NONBLOCK, &nonBlock, &nonBlockLen);
+
+	if ((flags & SOCK_NONBLOCK) != 0) {
+		nonBlock = 1;
+		error = sStackInterface->setsockopt(socket, SOL_SOCKET, SO_NONBLOCK,
+			&nonBlock, sizeof(nonBlock));
+	} else {
+		socklen_t nonBlockLen = sizeof(int32);
+		// Get the socket's non-blocking flag, so we can set the respective
+		// open mode flag.
+		error = sStackInterface->getsockopt(socket, SOL_SOCKET, SO_NONBLOCK,
+			&nonBlock, &nonBlockLen);
+	}
+
 	if (error != B_OK)
 		return error;
 
@@ -353,16 +366,26 @@ create_socket_fd(net_socket* socket, bool kernel)
 	if (descriptor == NULL)
 		return B_NO_MEMORY;
 
+	bool closeOnExec = (flags & SOCK_CLOEXEC) != 0;
+
 	// init it
 	descriptor->type = FDTYPE_SOCKET;
 	descriptor->ops = &sSocketFDOps;
 	descriptor->u.socket = socket;
-	descriptor->open_mode = O_RDWR | (nonBlock ? O_NONBLOCK : 0);
+	descriptor->open_mode = O_RDWR | (nonBlock ? O_NONBLOCK : 0)
+		| (closeOnExec ? O_CLOEXEC : 0);
 
 	// publish it
-	int fd = new_fd(get_current_io_context(kernel), descriptor);
-	if (fd < 0)
+	io_context* context = get_current_io_context(kernel);
+	int fd = new_fd(context, descriptor);
+	if (fd < 0) {
 		free(descriptor);
+		return fd;
+	}
+
+	mutex_lock(&context->io_mutex);
+	fd_set_close_on_exec(context, fd, closeOnExec);
+	mutex_unlock(&context->io_mutex);
 
 	return fd;
 }
@@ -379,14 +402,15 @@ common_socket(int family, int type, int protocol, bool kernel)
 
 	// create the socket
 	net_socket* socket;
-	status_t error = sStackInterface->open(family, type, protocol, &socket);
+	status_t error = sStackInterface->open(family, SOCKET_TYPE(type), protocol,
+		&socket);
 	if (error != B_OK) {
 		put_stack_interface_module();
 		return error;
 	}
 
 	// allocate the FD
-	int fd = create_socket_fd(socket, kernel);
+	int fd = create_socket_fd(socket, SOCKET_FLAGS(type), kernel);
 	if (fd < 0) {
 		sStackInterface->close(socket);
 		sStackInterface->free(socket);
@@ -459,7 +483,7 @@ common_accept(int fd, struct sockaddr *address, socklen_t *_addressLength,
 		return error;
 
 	// allocate the FD
-	int acceptedFD = create_socket_fd(acceptedSocket, kernel);
+	int acceptedFD = create_socket_fd(acceptedSocket, 0, kernel);
 	if (acceptedFD < 0) {
 		sStackInterface->close(acceptedSocket);
 		sStackInterface->free(acceptedSocket);
@@ -612,8 +636,8 @@ common_socketpair(int family, int type, int protocol, int fds[2], bool kernel)
 		return B_UNSUPPORTED;
 
 	net_socket* sockets[2];
-	status_t error = sStackInterface->socketpair(family, type, protocol,
-		sockets);
+	status_t error = sStackInterface->socketpair(family, SOCKET_TYPE(type),
+		protocol, sockets);
 	if (error != B_OK) {
 		put_stack_interface_module();
 		return error;
@@ -621,7 +645,7 @@ common_socketpair(int family, int type, int protocol, int fds[2], bool kernel)
 
 	// allocate the FDs
 	for (int i = 0; i < 2; i++) {
-		fds[i] = create_socket_fd(sockets[i], kernel);
+		fds[i] = create_socket_fd(sockets[i], SOCKET_FLAGS(type), kernel);
 		if (fds[i] < 0) {
 			sStackInterface->close(sockets[i]);
 			sStackInterface->free(sockets[i]);

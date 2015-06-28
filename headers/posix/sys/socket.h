@@ -41,11 +41,15 @@ typedef uint8_t sa_family_t;
 #define PF_BLUETOOTH	AF_BLUETOOTH
 
 /* Socket types */
-#define	SOCK_STREAM	1
-#define	SOCK_DGRAM	2
-#define	SOCK_RAW	3
+#define	SOCK_STREAM		1
+#define	SOCK_DGRAM		2
+#define	SOCK_RAW		3
 #define	SOCK_SEQPACKET	5
-#define SOCK_MISC	255
+#define SOCK_MISC		255
+
+/* Socket creation options */
+#define SOCK_CLOEXEC	0x00001000
+#define SOCK_NONBLOCK	0x00002000
 
 /* Socket options for SOL_SOCKET level */
 #define	SOL_SOCKET		-1
