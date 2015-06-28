@@ -532,7 +532,7 @@ deselect_select_infos(file_descriptor* descriptor, select_info* infos,
 
 	select_info* info = infos;
 	while (info != NULL) {
-		select_sync* sync = info->sync;
+		select_sync_base* sync = info->sync;
 
 		// deselect the selected events
 		uint16 eventsToDeselect = info->selected_events & ~B_EVENT_INVALID;

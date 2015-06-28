@@ -100,11 +100,7 @@ public:
 
 		inline void Remove()
 		{
-			if (AVLTreeNode* node = ConstIterator::fTreeIterator.Remove()) {
-				AVLTree<Definition>* parent
-					= const_cast<AVLTree<Definition>*>(
-						ConstIterator::fParent);
-			}
+			ConstIterator::fTreeIterator.Remove();
 		}
 
 	private:

@@ -73,6 +73,12 @@ extern status_t		_kern_get_safemode_option(const char *parameter,
 extern ssize_t		_kern_wait_for_objects(object_wait_info* infos, int numInfos,
 						uint32 flags, bigtime_t timeout);
 
+extern int			_kern_event_queue_create(int openFlags);
+extern status_t		_kern_event_queue_select(int queue,
+						event_wait_info* userInfos, int numInfos);
+extern ssize_t		_kern_event_queue_wait(int queue, event_wait_info* infos,
+						int numInfos, uint32 flags, bigtime_t timeout);
+
 /* user mutex functions */
 extern status_t		_kern_mutex_lock(int32* mutex, const char* name,
 						uint32 flags, bigtime_t timeout);

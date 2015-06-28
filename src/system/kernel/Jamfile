@@ -31,6 +31,7 @@ KernelMergeObject kernel_core.o :
 	cpu.cpp
 	DPC.cpp
 	elf.cpp
+	event_queue.cpp
 	guarded_heap.cpp
 	heap.cpp
 	image.cpp

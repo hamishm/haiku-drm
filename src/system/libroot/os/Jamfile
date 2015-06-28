@@ -19,6 +19,7 @@ for architectureObject in [ MultiArchSubDirSetup ] {
 			atomic.c
 			debug.c
 			driver_settings.cpp
+			event_queue.cpp
 			extended_system_info.cpp
 			find_directory.cpp
 			find_paths.cpp
