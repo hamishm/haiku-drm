@@ -15,9 +15,9 @@
 
 
 BNetworkRequest::BNetworkRequest(const BUrl& url, BUrlProtocolListener* listener,
-		BUrlContext* context, const char* threadName, const char* protocolName)
+		BUrlContext* context)
 	:
-	BUrlRequest(url, listener, context, threadName, protocolName),
+	BUrlRequest(url, listener, context),
 	fSocket(NULL)
 {
 }

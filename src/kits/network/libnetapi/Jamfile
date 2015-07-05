@@ -36,6 +36,15 @@ for architectureObject in [ MultiArchSubDirSetup ] {
 			SetupFeatureObjectsDir no-ssl ;
 		}
 
+		if $(TARGET_PACKAGING_ARCH) != x86_gcc2 {
+			SubDirC++Flags -std=c++1y ;
+			asyncSources =
+				EventDispatcher.cpp
+				AsyncSocket.cpp ;
+		} else {
+			asyncSources = ;
+		}
+
 		# BUrl uses ICU to perform IDNA conversions (unicode domain names)
 		UseBuildFeatureHeaders icu ;
 		Includes [ FGristFiles Url.cpp ]
@@ -66,6 +75,8 @@ for architectureObject in [ MultiArchSubDirSetup ] {
 			DatagramSocket.cpp
 			Socket.cpp
 			SecureSocket.cpp
+
+			$(asyncSources)
 
 			# TODO: another add-on for file:// (a much simpler one)
 			FileRequest.cpp

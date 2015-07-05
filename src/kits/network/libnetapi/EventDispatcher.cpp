@@ -1,30 +1,22 @@
 /*
  * Copyright 2015, Hamish Morrison, hamishm53@gmail.com.
- * All rights reserved. Released under the terms of the MIT license.
+ * All rights reserved. Distributed under the terms of the MIT License.
  */
 
 #include <EventDispatcher.h>
 
-#include <Debug.h>
-#include <StackOrHeapArray.h>
+#include <OS.h>
+
+#if 0
 #include <util/Heap.h>
+#endif
 
-
-struct BEventDispatcher::Waiter {
-	int32 object;
-	uint16 type;
-	uint16 events;
-
-	bool one_shot;
-	std::function<void (int)> callback;
-};
+#define EVENTS_TO_READ	50
 
 
 BEventDispatcher::BEventDispatcher()
-	:
-	fTimers(20),
-	fWaiters(20)
 {
+	fEventQueue = event_queue_create(O_CLOEXEC);
 }
 
 
@@ -33,11 +25,18 @@ BEventDispatcher::~BEventDispatcher()
 }
 
 
+status_t
+BEventDispatcher::InitCheck()
+{
+	return fEventQueue;
+}
+
+
 void
 BEventDispatcher::_DispatchTimers()
 {
-	bigtime_t current = real_time_clock_usecs();
-
+	//bigtime_t current = real_time_clock_usecs();
+#if 0
 	while (Timer* timer = fTimers.PeekRoot()) {
 		if (fTimers.GetKey(timer) > current)
 			break;
@@ -45,14 +44,19 @@ BEventDispatcher::_DispatchTimers()
 		timer->function();
 		fTimers.RemoveRoot();
 	}
+#endif
 }
 
 
 bigtime_t
 BEventDispatcher::_DetermineTimeout()
 {
+#if 0
 	Timer* first = fTimers.PeekRoot();
 	return first != NULL ? fTimers.GetKey(first) : B_INFINITE_TIMEOUT;
+#else
+	return B_INFINITE_TIMEOUT;
+#endif
 }
 
 
@@ -61,88 +65,46 @@ BEventDispatcher::RunOnce()
 {
 	_DispatchTimers();
 
-	int32 waiters = fWaiters.CountItems();
-
-	BStackOrHeapArray<object_wait_info, 50> array(waiters);
-	if (!array.IsValid())
-		return B_NO_MEMORY;
-
-	for (ConstIterator 
-	for (int i = 0; i < waiters; i++) {
-		array[i].object = fWaiters.ItemAt(i)->object;
-		array[i].type = fWaiters.ItemAt(i)->type;
-		array[i].events = fWaiters.ItemAt(i)->events;
-	}
 
 	bigtime_t timeout = _DetermineTimeout();
-	ssize_t result = wait_for_objects_etc(array, waiters, B_ABSOLUTE_TIMEOUT,
-		timeout);
 
-	if (result == B_TIMED_OUT || result == B_WOULD_BLOCK)
-		result = B_OK;
+	event_wait_info infos[EVENTS_TO_READ];
 
-	if (result != B_OK)
+	ssize_t result = event_queue_wait(fEventQueue, infos, EVENTS_TO_READ,
+		B_ABSOLUTE_REAL_TIME_TIMEOUT, timeout);
+
+	if (result < B_OK)
 		return result;
 
-	ssize_t remaining = result;
-	for (int i = 0, j = 0; i < waiters && remaining > 0; i++, j++) {
-		if (array[i].events != 0) {
-			remaining--;
+	for (ssize_t i = 0; i < result; i++) {
+		int32 events = infos[i].events;
 
-			Waiter* waiter = fWaiters.ItemAt(j);
-			if (waiter->oneShot) {
-				fWaiters.RemoveItemAt(i);
-				j--;
-			}
-
-			waiter->callback(array[i].events);
-		}
+		Wrapper* wrapper = (Wrapper*)infos[i].user_data;
+		(*wrapper)(events);
 	}
 
 	return result;
 }
 
-/*
-void
-WaitForFD(int fd, int events, Callback callback, bool oneShot)
+
+status_t
+BEventDispatcher::_WaitForObject(int32 object, uint16 type, uint16 events,
+	Wrapper* wrapper, bool oneShot)
 {
-	return _WaitForObject(fd, B_OBJECT_TYPE_FD, events, callback, oneShot);
-}
+	event_wait_info info;
+	info.object = object;
+	info.type = type;
+	info.events = events | B_EVENT_SELECT | (oneShot ? B_EVENT_ONE_SHOT : 0);
+	info.user_data = (void*)wrapper;
 
+	status_t result = event_queue_select(fEventQueue, &info, 1);
 
-void
-WaitForSem(sem_id sem, int events, Callback callback, bool oneShot)
-{
-	return _WaitForObject(sem, B_OBJECT_TYPE_SEMAPHORE, events, callback,
-		oneShot);
-}
+	// Somewhat ugly: if the error is 'B_ERROR' then the error is stored in the
+	// events field of the event_wait_info.
+	if (result == B_ERROR)
+		return info.events;
+	else if (result != B_OK)
+		return result;
 
-
-void
-WaitForPort(port_id port, int events, Callback callback, bool oneShot)
-{
-	return _WaitForObject(port, B_OBJECT_TYPE_PORT, events, callback, oneShot);
-}
-
-
-void
-WaitForThread(thread_id thread, int events, Callback callback, bool oneShot)
-{
-	return _WaitForObject(thread, B_OBJECT_TYPE_THREAD, events, callback,
-		oneShot);
-}
-*/
-
-void
-WaitForObject(int32 object, uint16 type, uint16 events, Callback callback,
-	bool oneShot)
-{
-	Waiter* waiter = new(std::nothrow) Waiter();
-	waiter->object = object;
-	waiter->type = type;
-	waiter->events = events;
-	waiter->callback = callback;
-	waiter->one_shot = oneShot;
-
-	fWaiters.Add(waiter);
+	return B_OK;
 }

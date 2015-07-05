@@ -94,6 +94,14 @@ struct _pthread_once {
 	__haiku_std_int32	state;
 };
 
+/*
+struct _pthread_rwlock {
+	__haiku_std_uint32	flags;
+	__haiku_std_int32	lock;
+	__haiku_std_int32	unused[6];
+};
+*/
+
 struct _pthread_rwlock {
 	__haiku_std_uint32	flags;
 	__haiku_std_int32	owner;

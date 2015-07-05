@@ -857,6 +857,7 @@ delete_owned_ports(Team* team)
 	// On success, move the port to deletionList.
 	Port* port = (Port*)list_get_first_item(&team->port_list);
 	while (port != NULL) {
+		uninit_port(port);
 		status_t status = delete_port_logical(port);
 			// Contains linearization point
 
@@ -890,7 +891,6 @@ delete_owned_ports(Team* team)
 	// Uninitialize ports and release team port list references
 	while (Port* port = (Port*)list_remove_head_item(&deletionList)) {
 		atomic_add(&sUsedPorts, -1);
-		uninit_port(port);
 		port->ReleaseReference();
 			// Reference for team port list
 	}
@@ -1100,6 +1100,8 @@ delete_port(port_id id)
 		return B_BAD_PORT_ID;
 	}
 
+	uninit_port(portRef);
+
 	status_t status = delete_port_logical(portRef);
 		// Contains linearization point
 	if (status != B_OK)
@@ -1125,8 +1127,6 @@ delete_port(port_id id)
 		list_remove_link(&portRef->team_link);
 		portRef->ReleaseReference();
 	}
-
-	uninit_port(portRef);
 
 	T(Delete(portRef));
 
@@ -1174,8 +1174,7 @@ select_port(int32 id, struct select_info* info, bool kernel)
 		if (portRef->write_count > 0)
 			events |= B_EVENT_WRITE;
 
-		if (events != 0)
-			notify_select_events(info, events);
+		return events;
 	}
 
 	return B_OK;

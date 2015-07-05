@@ -48,8 +48,8 @@ protected:
 			status_t			Connect(const BNetworkAddress& peer, int type,
 									bigtime_t timeout = B_INFINITE_TIMEOUT);
 
-private:
 			status_t			_OpenIfNeeded(int family, int type);
+private:
 			status_t			_UpdateLocalAddress();
 			status_t			_WaitFor(int flags, bigtime_t timeout) const;
 

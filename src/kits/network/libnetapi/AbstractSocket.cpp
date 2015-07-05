@@ -223,7 +223,7 @@ BAbstractSocket::_OpenIfNeeded(int family, int type)
 	if (fSocket >= 0)
 		return B_OK;
 
-	fSocket = socket(family, type, 0);
+	fSocket = socket(family, type | SOCK_CLOEXEC, 0);
 	if (fSocket < 0)
 		return errno;
 
