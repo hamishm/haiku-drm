@@ -79,7 +79,7 @@ BEventDispatcher::RunOnce()
 	for (ssize_t i = 0; i < result; i++) {
 		int32 events = infos[i].events;
 
-		Wrapper* wrapper = (Wrapper*)infos[i].user_data;
+		EventCallback* wrapper = (EventCallback*)infos[i].user_data;
 		(*wrapper)(events);
 	}
 
@@ -88,14 +88,14 @@ BEventDispatcher::RunOnce()
 
 
 status_t
-BEventDispatcher::_WaitForObject(int32 object, uint16 type, uint16 events,
-	Wrapper* wrapper, bool oneShot)
+BEventDispatcher::WaitForObject(int32 object, uint16 type, uint16 events,
+	EventCallback& callback, bool oneShot)
 {
 	event_wait_info info;
 	info.object = object;
 	info.type = type;
 	info.events = events | B_EVENT_SELECT | (oneShot ? B_EVENT_ONE_SHOT : 0);
-	info.user_data = (void*)wrapper;
+	info.user_data = (void*)&callback;
 
 	status_t result = event_queue_select(fEventQueue, &info, 1);
 

@@ -106,6 +106,17 @@ public:
 
 		Called once the request is complete.
 	*/
+	virtual void				RequestFailed(BUrlRequest* caller,
+									status_t error);
+
+	/**
+		RequestCompleted(success)
+		Frequency:	Once
+		Parameters:	success			true if the resource have been successfully
+									false if not
+
+		Called once the request is complete.
+	*/
 	virtual void				RequestCompleted(BUrlRequest* caller,
 									bool success);
 

@@ -38,9 +38,15 @@ for architectureObject in [ MultiArchSubDirSetup ] {
 
 		if $(TARGET_PACKAGING_ARCH) != x86_gcc2 {
 			SubDirC++Flags -std=c++1y ;
+
+			SEARCH_SOURCE += [ FDirName $(SUBDIR) nb ] ;
+			UseHeaders [ FDirName $(SUBDIR) nb ] : true ;
+
 			asyncSources =
 				EventDispatcher.cpp
-				AsyncSocket.cpp ;
+				AsyncSocket.cpp
+				HTTPSession.cpp
+				http_parser.c ;
 		} else {
 			asyncSources = ;
 		}

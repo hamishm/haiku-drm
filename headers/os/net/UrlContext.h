@@ -19,7 +19,7 @@ namespace BPrivate {
 }
 
 
-class BUrlContext: public BReferenceable {
+class BUrlContext : public BReferenceable {
 public:
 								BUrlContext();
 								~BUrlContext();

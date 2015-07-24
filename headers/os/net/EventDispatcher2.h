@@ -24,20 +24,25 @@ public:
 
 			status_t	RunOnce();
 
-	inline	status_t	WaitForFD(int fd, int events, EventCallback& callback,
+			template<typename Callback>
+	inline	status_t	WaitForFD(int fd, int events, Callback&& callback,
 							bool oneShot = true);
 
+			template<typename Callback>
 	inline	status_t	WaitForPort(port_id port, int events,
-							EventCallback& callback, bool oneShot = true);
+							Callback&& callback, bool oneShot = true);
 
+			template<typename Callback>
 	inline	status_t	WaitForSemaphore(sem_id semaphore, int events,
-							EventCallback& callback, bool oneShot = true);
+							Callback&& callback, bool oneShot = true);
 
+			template<typename Callback>
 	inline	status_t	WaitForThread(thread_id thread, int events,
-							EventCallback& callback, bool oneShot = true);
+							Callback&& callback, bool oneShot = true);
 
-			status_t	WaitForObject(int32 object, uint16 type, uint16 events,
-							EventCallback& callback, bool oneShot = true);
+			template<typename Callback>
+	inline	status_t	WaitForObject(int32 object, uint16 type, uint16 events,
+							Callback&& callback, bool oneShot = true);
 
 #if 0
 			template<typename Function>
@@ -47,8 +52,14 @@ public:
 			void		ExecuteLater(Function function);
 #endif
 private:
+	typedef std::function<void(int)> Wrapper;
+
 			bigtime_t	_DetermineTimeout();
 			void		_DispatchTimers();
+
+			status_t	_WaitForObject(int32 object, uint16 type,
+							uint16 events, Wrapper* waiter,
+							bool oneShot);
 
 private:
 #if 0
@@ -57,6 +68,25 @@ private:
 		Function function;
 	};
 #endif
+
+
+	template<typename Callback>
+	struct EventWaiter {
+		EventWaiter(Callback&& callback)
+		{
+			fCallback = callback;
+			fWrapper = std::ref(callback);
+		}
+
+		void DoCallback(int events)
+		{
+			fCallback(events);
+			delete this;
+		}
+
+		Callback	fCallback;
+		Wrapper		fWrapper;
+	};
 
 #if 0
 	typedef Heap<Timer, bigtime_t, HeapLesserCompare<bigtime_t>> TimerHeap;
@@ -68,8 +98,9 @@ private:
 };
 
 
+template<typename Callback>
 status_t
-BEventDispatcher::WaitForFD(int fd, int events, EventCallback& callback,
+BEventDispatcher::WaitForFD(int fd, int events, Callback&& callback,
 	bool oneShot)
 {
 	return WaitForObject(fd, B_OBJECT_TYPE_FD, events, callback, oneShot);
@@ -77,32 +108,54 @@ BEventDispatcher::WaitForFD(int fd, int events, EventCallback& callback,
 }
 
 
+template<typename Callback>
 status_t
-BEventDispatcher::WaitForPort(port_id port, int events,
-	EventCallback& callback, bool oneShot)
+BEventDispatcher::WaitForPort(port_id port, int events, Callback&& callback,
+	bool oneShot)
 {
 	return WaitForObject(port, B_OBJECT_TYPE_PORT, events, callback, oneShot);
 }
 
 
+template<typename Callback>
 status_t
 BEventDispatcher::WaitForSemaphore(sem_id semaphore, int events,
-	EventCallback& callback, bool oneShot)
+	Callback&& callback, bool oneShot)
 {
 	return WaitForObject(semaphore, B_OBJECT_TYPE_SEMAPHORE, events, callback,
 		oneShot);
 }
 
 
+template<typename Callback>
 status_t
 BEventDispatcher::WaitForThread(thread_id thread, int events,
-	EventCallback& callback, bool oneShot)
+	Callback&& callback, bool oneShot)
 {
 	return WaitForObject(thread, B_OBJECT_TYPE_THREAD, events, callback,
 		oneShot);
 }
 
 
+template<typename Callback>
+status_t
+BEventDispatcher::WaitForObject(int32 object, uint16 type, uint16 events,
+	Callback&& callback, bool oneShot)
+{
+	EventWaiter<Callback>* waiter = new(std::nothrow)
+		EventWaiter<Callback>(callback);
+	if (waiter == NULL)
+		return B_NO_MEMORY;
+
+	status_t status = _WaitForObject(object, type, events, &waiter->fWrapper,
+		oneShot);
+	if (status != B_OK) {
+		delete waiter;
+		return status;
+	}
+
+	status;
+}
 
 
-#endif	// _EVENT_DISPATCHER_H
+#endif // _EVENT_DISPATCHER_H
